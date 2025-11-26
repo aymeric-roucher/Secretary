@@ -1,0 +1,13 @@
+.DS_Store
+/.build
+/.build_xcode
+/DerivedData
+/*.app
+/*.xcodeproj
+/*.xcworkspace
+.swiftpm
+/venv
+__pycache__
+*.o
+*.d
+.env
