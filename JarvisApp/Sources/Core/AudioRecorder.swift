@@ -41,8 +41,12 @@ class AudioRecorder: NSObject, ObservableObject {
         
         // 2. Proceed with recording if authorized
         do {
-            let fileURL = getDocumentsDirectory().appendingPathComponent("recording.m4a")
-            log("Recording to file: \(fileURL.lastPathComponent)")
+            let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let jarvisDir = docs.appendingPathComponent("Jarvis")
+            try? FileManager.default.createDirectory(at: jarvisDir, withIntermediateDirectories: true)
+            
+            let fileURL = jarvisDir.appendingPathComponent("recording.m4a")
+            log("Recording to file: \(fileURL.path)")
             
             let settings: [String: Any] = [
                 AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
@@ -93,12 +97,30 @@ class AudioRecorder: NSObject, ObservableObject {
             guard let self = self else { return }
             self.audioRecorder?.updateMeters()
             let power = self.audioRecorder?.averagePower(forChannel: 0) ?? -160
-            let level = max(0.0, (power + 160) / 160)
+            
+            // Convert dB to linear amplitude (0.0 to 1.0)
+            // -160dB is silence, 0dB is max
+            // Simple approximation: normalize -60dB (noise floor) to 0dB
+            let minDb: Float = -60.0
+            
+            var level: Float = 0.0
+            if power < minDb {
+                level = 0.0
+            } else if power >= 0.0 {
+                level = 1.0
+            } else {
+                // Linearize
+                level = (power - minDb) / (0.0 - minDb)
+            }
+            
+            // Debug: Print level occasionally
+            if Int.random(in: 0...20) == 0 {
+                log("Mic Level: \(level) (Power: \(power))")
+            }
             
             DispatchQueue.main.async {
-                if self.audioLevels.count > 20 { self.audioLevels.removeFirst() }
+                if self.audioLevels.count > 40 { self.audioLevels.removeFirst() }
                 self.audioLevels.append(level)
-                // log("Audio Level: \(level)") // Too verbose, uncomment for deep debug
             }
         }
     }

@@ -71,7 +71,7 @@ struct GeminiClient {
         let body: [String: Any] = [
             "contents": [[
                 "parts": [
-                    ["text": "Describe this audio clip"],
+                    ["text": "Transcribe the spoken audio verbatim. Do not summarize. Output only the exact text spoken."],
                     ["file_data": ["mime_type": mimeType, "file_uri": fileURI]]
                 ]
             ]]

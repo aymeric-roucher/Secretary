@@ -108,3 +108,10 @@ print(response["choices"][0]["message"])
 That model should be promptd to give a structured output with keys "reasoning", "tool_name", "tool_arguments", with the following set of toole: type (to just type in the currently selected textarea), open_app (to open a specific app by name, can be used to open browser at the given url or google search), deep_research (if the user asks to perform deep research on a speccific topic), switch_to (swtich the app displays do show another app by name amongg all open apps, this could be the equivalent of the Windows Alt+Tab).
 
 So of course the app should have a setup upon first launch that has these pages: asking for authorizations (showing how to do this, with screenshots showing how to activate in mac settings), choosing languages (multi-select, users can have several languages), and at the end a button like "Let's go" to close it. The app should also be able to be open later on, this time showing different configuration tabs in one column to the left: Home (with logs of transcription and a dashboard with the count of words spoken), Dictionnary (to provide common abbreviations or snippets to transcribe in a certain way), Style (to provide some examples of emails, etc for style reference), and at the bottom left a Settings gear button.
+
+
+### Implementation
+
+You can go visit prompt under
+- JarvisApp/Sources/Core/GeminiClient.swift
+- JarvisApp/Sources/Core/CerebrasClient.swift

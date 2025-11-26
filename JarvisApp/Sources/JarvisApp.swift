@@ -91,13 +91,26 @@ enum SettingsTab: String {
     case home, dictionary, style, settings
 }
 
+struct ChatMessage: Identifiable {
+    let id = UUID()
+    let role: MessageRole
+    let content: String
+}
+
+enum MessageRole {
+    case user
+    case assistant
+    case system
+    case tool
+}
+
 @MainActor
 class AppState: ObservableObject {
     static var shared: AppState?
     
     @Published var isSpotlightVisible: Bool = false
     @Published var isRecording: Bool = false
-    @Published var transcript: String = "Ready"
+    @Published var messages: [ChatMessage] = [ChatMessage(role: .system, content: "Ready")]
     @Published var selectedTab: SettingsTab = .home
     
     let audioRecorder = AudioRecorder()
@@ -143,7 +156,6 @@ class AppState: ObservableObject {
         if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "spotlight" }) {
             window.orderOut(nil)
         }
-        // Don't NSApp.hide() because it hides the Settings window too if open
     }
     
     func toggleRecording() {
@@ -155,14 +167,16 @@ class AppState: ObservableObject {
     }
     
     func pasteLastTranscript() {
-        toolManager.execute(toolName: "type", args: .text(transcript))
+        if let last = messages.last(where: { $0.role == .user }) {
+            toolManager.execute(toolName: "type", args: .text(last.content))
+        }
     }
     
     func startRecording() {
         log("Started recording")
         isRecording = true
         audioRecorder.startRecording()
-        transcript = "Listening..."
+        // We don't clear messages, we append.
     }
     
     func stopRecording() {
@@ -172,7 +186,9 @@ class AppState: ObservableObject {
             return 
         }
         isRecording = false
-        transcript = "Processing..."
+        
+        // Add placeholder while processing? Or just wait.
+        // self.messages.append(ChatMessage(role: .system, content: "Processing..."))
         
         Task {
             do {
@@ -180,7 +196,7 @@ class AppState: ObservableObject {
                 let hfKey = UserDefaults.standard.string(forKey: "hfApiKey") ?? ""
                 
                 if geminiKey.isEmpty || hfKey.isEmpty {
-                    self.transcript = "Please set API Keys in Settings."
+                    self.messages.append(ChatMessage(role: .system, content: "Please set API Keys in Settings."))
                     log("Missing API Keys")
                     return
                 }
@@ -190,22 +206,29 @@ class AppState: ObservableObject {
                 let text = try await gemini.transcribeAudio(fileURL: fileURL)
                 log("Transcription result: \(text)")
                 
-                self.transcript = text
+                self.messages.append(ChatMessage(role: .user, content: text))
                 
                 // Process with Cerebras
                 let cerebras = CerebrasClient(apiKey: hfKey)
                 log("Requesting tool call...")
                 if let toolCall = try await cerebras.processCommand(input: text) {
-                    self.transcript = "Executing: \(toolCall.tool_name)..."
+                    
+                    if !toolCall.reasoning.isEmpty {
+                        self.messages.append(ChatMessage(role: .assistant, content: toolCall.reasoning))
+                    }
+                    
+                    let toolMsg = "Running: \(toolCall.tool_name)(\(toolCall.tool_arguments))"
+                    self.messages.append(ChatMessage(role: .tool, content: toolMsg))
+                    
                     log("Tool call: \(toolCall.tool_name) args: \(toolCall.tool_arguments)")
                     self.toolManager.execute(toolName: toolCall.tool_name, args: toolCall.tool_arguments)
-                    self.transcript = "Done: \(toolCall.reasoning)"
+                    
                 } else {
                     log("No tool call generated")
                 }
                 
             } catch {
-                self.transcript = "Error: \(error.localizedDescription)"
+                self.messages.append(ChatMessage(role: .system, content: "Error: \(error.localizedDescription)"))
                 log("Error processing: \(error)")
             }
         }

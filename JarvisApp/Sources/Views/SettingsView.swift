@@ -224,9 +224,24 @@ struct GeneralSettingsView: View {
     }
     
     func checkMic() {
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized: micStatus = true
-        default: micStatus = false
+        let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        switch status {
+        case .authorized:
+            micStatus = true
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .audio) { granted in
+                DispatchQueue.main.async {
+                    micStatus = granted
+                }
+            }
+        case .denied, .restricted:
+            micStatus = false
+            // Optionally open settings:
+            // if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+            //    NSWorkspace.shared.open(url)
+            // }
+        @unknown default:
+            micStatus = false
         }
     }
     
