@@ -93,6 +93,8 @@ enum SettingsTab: String {
 
 @MainActor
 class AppState: ObservableObject {
+    static var shared: AppState?
+    
     @Published var isSpotlightVisible: Bool = false
     @Published var isRecording: Bool = false
     @Published var transcript: String = "Ready"
@@ -102,6 +104,7 @@ class AppState: ObservableObject {
     let toolManager = ToolManager()
     
     init() {
+        AppState.shared = self
         // Listen for the toggle notification here, in the persistent state object
         NotificationCenter.default.addObserver(self, selector: #selector(handleToggleNotification), name: NSNotification.Name("ToggleJarvis"), object: nil)
     }
@@ -155,14 +158,14 @@ class AppState: ObservableObject {
         toolManager.execute(toolName: "type", args: .text(transcript))
     }
     
-    private func startRecording() {
+    func startRecording() {
         log("Started recording")
         isRecording = true
         audioRecorder.startRecording()
         transcript = "Listening..."
     }
     
-    private func stopRecording() {
+    func stopRecording() {
         log("Stopped recording")
         guard let fileURL = audioRecorder.stopRecording() else {
             log("Error: No file URL returned from recorder")
@@ -217,6 +220,9 @@ class AppState: ObservableObject {
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var hotKeyRef: EventHotKeyRef?
+    var pollingTimer: Timer? // For Hold-to-Talk
+    var lastKeyCode: UInt32 = 0
+    var lastModifiers: UInt32 = 0
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         log("Application finished launching")
@@ -241,40 +247,113 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let ref = hotKeyRef {
             UnregisterEventHotKey(ref)
             hotKeyRef = nil
+            // Stop polling if active
+            pollingTimer?.invalidate()
+            pollingTimer = nil
         }
         registerHotKey()
     }
     
     func registerHotKey() {
-        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        
-        let status = InstallEventHandler(GetApplicationEventTarget(), { (nextHandler, theEvent, userData) -> OSStatus in
-            log("Global Hotkey Handler Triggered!")
-            NotificationCenter.default.post(name: NSNotification.Name("ToggleJarvis"), object: nil)
-            return noErr
-        }, 1, &eventType, nil, nil)
-        
-        if status != noErr {
-            log("Error installing event handler: \(status)")
+        // Unregister any existing hotkey first
+        if let ref = hotKeyRef {
+            UnregisterEventHotKey(ref)
+            hotKeyRef = nil
         }
         
         let hotKeyID = EventHotKeyID(signature: OSType(0x11223344), id: 1)
-        var hotKeyRef: EventHotKeyRef?
+        var newHotKeyRef: EventHotKeyRef?
         
-        // Load from defaults or use Control+Space (4096, 49)
-        let mod = UserDefaults.standard.integer(forKey: "JarvisShortcutModifier")
-        let key = UserDefaults.standard.integer(forKey: "JarvisShortcutKey")
+        // Load from defaults or use Shift+Space (default)
+        let savedMod = UserDefaults.standard.integer(forKey: "JarvisShortcutModifier")
+        let savedKey = UserDefaults.standard.integer(forKey: "JarvisShortcutKey")
         
-        let finalMod = mod == 0 ? UInt32(controlKey) : UInt32(mod)
-        let finalKey = key == 0 ? 49 : UInt32(key)
+        // Default: Shift (512) + Space (49)
+        lastModifiers = savedMod == 0 ? UInt32(shiftKey) : UInt32(savedMod)
+        lastKeyCode = savedKey == 0 ? 49 : UInt32(savedKey)
         
-        let err = RegisterEventHotKey(finalKey, finalMod, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
+        // Register the HotKey. This will fire on keydown.
+        let err = RegisterEventHotKey(lastKeyCode, lastModifiers, hotKeyID, GetApplicationEventTarget(), 0, &newHotKeyRef)
         
         if err == noErr {
-            self.hotKeyRef = hotKeyRef
-            log("Global hotkey registered: Mod \(finalMod) Key \(finalKey)")
+            hotKeyRef = newHotKeyRef
+            log("Global hotkey registered: Mod \(lastModifiers) Key \(lastKeyCode)")
         } else {
             log("Failed to register global hotkey: \(err)")
+        }
+        
+        // Install handler for the hotkey press event
+        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        InstallEventHandler(GetApplicationEventTarget(), { (nextHandler, theEvent, userData) -> OSStatus in
+            log("Global Hotkey Handler Triggered (Pressed)!")
+            
+            // Dispatch to Main Actor to access AppState safely
+            DispatchQueue.main.async {
+                guard let appState = AppState.shared else { return }
+                
+                // Check if recording, if so, this is a toggle to stop early
+                if appState.isRecording {
+                     appState.stopRecording()
+                     // We need to access AppDelegate instance to stop timer
+                     if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
+                         appDelegate.pollingTimer?.invalidate()
+                         appDelegate.pollingTimer = nil
+                     }
+                     return
+                }
+                
+                // Start recording and polling
+                appState.startRecording()
+                if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
+                    appDelegate.startPollingForKeyState()
+                }
+                
+                // We still toggle the spotlight view so the user sees the input field
+                NotificationCenter.default.post(name: NSNotification.Name("ToggleJarvis"), object: nil)
+            }
+            
+            return noErr
+        }, 1, &eventType, nil, nil)
+    }
+    
+    func startPollingForKeyState() {
+        log("Starting polling for key state...")
+        pollingTimer?.invalidate() // Stop any previous timer
+        
+        let keyToMonitor = self.lastKeyCode
+        let modifiersToMonitor = self.lastModifiers
+        
+        pollingTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            DispatchQueue.main.async {
+                guard let self = self, let appState = AppState.shared, appState.isRecording else {
+                    self?.pollingTimer?.invalidate()
+                    self?.pollingTimer = nil
+                    log("Polling stopped (not recording or appState missing).")
+                    return
+                }
+                
+                // Correctly use static CGEventSource.keyState
+                let isKeyPressed = CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(keyToMonitor))
+                
+                // Check modifiers using CGEventSource flags
+                let flags = CGEventSource.flagsState(.combinedSessionState)
+                
+                // Check modifier keys explicitly (Control, Option, Shift, Command)
+                var currentModifiers: UInt32 = 0
+                if flags.contains(.maskControl) { currentModifiers |= UInt32(controlKey) }
+                if flags.contains(.maskAlternate) { currentModifiers |= UInt32(optionKey) }
+                if flags.contains(.maskShift) { currentModifiers |= UInt32(shiftKey) }
+                if flags.contains(.maskCommand) { currentModifiers |= UInt32(cmdKey) }
+                
+                // Strict check: key must be pressed. Modifiers are looser (if they release mods but hold key, maybe keep recording?)
+                // Let's enforce both for Hold-to-Talk behavior.
+                if !isKeyPressed || (currentModifiers & modifiersToMonitor) != modifiersToMonitor {
+                    log("Hotkey released. Stopping recording.")
+                    appState.stopRecording()
+                    self.pollingTimer?.invalidate()
+                    self.pollingTimer = nil
+                }
+            }
         }
     }
 }

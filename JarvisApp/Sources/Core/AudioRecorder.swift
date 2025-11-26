@@ -9,44 +9,86 @@ class AudioRecorder: NSObject, ObservableObject {
     private var timer: Timer?
     
     func startRecording() {
-        // On macOS, we don't use AVAudioSession in the same way as iOS.
-        // We can usually just proceed to record.
+        log("Attempting to start recording.")
         
+        // 1. Check Microphone Permission
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            log("Microphone access authorized.")
+        case .notDetermined:
+            log("Microphone access not determined, requesting...")
+            AVCaptureDevice.requestAccess(for: .audio) { granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        log("Microphone access granted after request. Retrying start recording.")
+                        self.startRecording() // Retry recording after permission granted
+                    } else {
+                        log("Microphone access denied after request.")
+                        self.isRecording = false
+                    }
+                }
+            }
+            return // Exit and wait for permission callback
+        case .denied, .restricted:
+            log("Microphone access denied or restricted. Cannot record.")
+            isRecording = false
+            return
+        @unknown default:
+            log("Unknown microphone authorization status.")
+            isRecording = false
+            return
+        }
+        
+        // 2. Proceed with recording if authorized
         do {
-            // Setup file path
             let fileURL = getDocumentsDirectory().appendingPathComponent("recording.m4a")
+            log("Recording to file: \(fileURL.lastPathComponent)")
             
-            // Settings
             let settings: [String: Any] = [
                 AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-                AVSampleRateKey: 12000,
+                AVSampleRateKey: 44100, // Increased sample rate for better quality/Gemini compatibility
                 AVNumberOfChannelsKey: 1,
-                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
+                AVEncoderBitRateKey: 128000 // Added bit rate
             ]
             
             audioRecorder = try AVAudioRecorder(url: fileURL, settings: settings)
             audioRecorder?.isMeteringEnabled = true
-            audioRecorder?.record()
+            audioRecorder?.delegate = self // Set delegate for events
             
-            isRecording = true
-            startMonitoring()
+            if audioRecorder?.record() == true {
+                isRecording = true
+                log("AudioRecorder started recording successfully.")
+                startMonitoring()
+            } else {
+                log("AudioRecorder failed to start recording.")
+                isRecording = false
+            }
             
         } catch {
-            print("Could not start recording: \(error)")
+            log("Failed to start audio recording: \(error.localizedDescription)")
+            isRecording = false
         }
     }
     
     func stopRecording() -> URL? {
+        log("Attempting to stop recording.")
         audioRecorder?.stop()
         isRecording = false
         stopMonitoring()
-        return audioRecorder?.url
+        if let url = audioRecorder?.url {
+            log("AudioRecorder stopped. Recorded file: \(url.lastPathComponent)")
+            return url
+        } else {
+            log("AudioRecorder stopped, but no URL found.")
+            return nil
+        }
     }
     
     private var monitoringTask: Task<Void, Never>?
 
     private func startMonitoring() {
-        // Use Task based timer to avoid runloop issues if possible, or just dispatch main
+        log("Starting audio level monitoring.")
         timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             self.audioRecorder?.updateMeters()
@@ -56,11 +98,13 @@ class AudioRecorder: NSObject, ObservableObject {
             DispatchQueue.main.async {
                 if self.audioLevels.count > 20 { self.audioLevels.removeFirst() }
                 self.audioLevels.append(level)
+                // log("Audio Level: \(level)") // Too verbose, uncomment for deep debug
             }
         }
     }
     
     private func stopMonitoring() {
+        log("Stopping audio level monitoring.")
         timer?.invalidate()
         timer = nil
         audioLevels.removeAll()
@@ -68,5 +112,18 @@ class AudioRecorder: NSObject, ObservableObject {
     
     private func getDocumentsDirectory() -> URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    }
+}
+
+extension AudioRecorder: AVAudioRecorderDelegate {
+    func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
+        log("audioRecorderDidFinishRecording successfully: \(flag)")
+        if !flag {
+            log("Recording finished unsuccessfully.")
+        }
+    }
+    
+    func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
+        log("audioRecorderEncodeErrorDidOccur: \(error?.localizedDescription ?? "Unknown error")")
     }
 }

@@ -58,8 +58,7 @@ struct SettingsView: View {
     }
     
     func loadLogs() {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let logFile = docs.appendingPathComponent("Jarvis_Log.txt")
+        let logFile = URL(fileURLWithPath: "/Users/aymeric/Documents/Code/Jarvis/Jarvis_Log.txt")
         if let content = try? String(contentsOf: logFile) {
             logContent = content
         } else {
@@ -68,8 +67,7 @@ struct SettingsView: View {
     }
     
     func clearLogs() {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let logFile = docs.appendingPathComponent("Jarvis_Log.txt")
+        let logFile = URL(fileURLWithPath: "/Users/aymeric/Documents/Code/Jarvis/Jarvis_Log.txt")
         try? "".write(to: logFile, atomically: true, encoding: .utf8)
         loadLogs()
     }
@@ -117,8 +115,7 @@ struct HomeView: View {
                 .padding(.top)
                 .padding(.horizontal)
             
-            let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            Text("Logs at: \(docs.appendingPathComponent("Jarvis_Log.txt").path)")
+            Text("Logs at: /Users/aymeric/Documents/Code/Jarvis/Jarvis_Log.txt")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .padding(.horizontal)

@@ -5,8 +5,8 @@ struct Logger {
     private let logFileURL: URL
     
     init() {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        logFileURL = docs.appendingPathComponent("Jarvis_Log.txt")
+        // Hardcoded to project root as requested for this dev environment
+        logFileURL = URL(fileURLWithPath: "/Users/aymeric/Documents/Code/Jarvis/Jarvis_Log.txt")
         
         // Create file if not exists
         if !FileManager.default.fileExists(atPath: logFileURL.path) {
@@ -14,24 +14,61 @@ struct Logger {
         }
     }
     
-    func log (_ message: String) {
-        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)
-        let entry = "[\(timestamp)] \(message)\n"
-        
-        print(entry) // Keep console output
-        
-        if let handle = try? FileHandle(forWritingTo: logFileURL) {
-            handle.seekToEndOfFile()
-            if let data = entry.data(using: .utf8) {
-                handle.write(data)
+            func log(_ message: String) {
+    
+                let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)
+    
+                let entry = "[\(timestamp)] \(message)\n"
+    
+                
+    
+                print(entry) // Keep console output
+    
+                
+    
+                do {
+    
+                    // Ensure file exists (create if not)
+    
+                    if !FileManager.default.fileExists(atPath: logFileURL.path) {
+    
+                        try "".write(to: logFileURL, atomically: true, encoding: .utf8)
+    
+                    }
+    
+                    
+    
+                    // Open file for appending
+    
+                    let fileHandle = try FileHandle(forWritingTo: logFileURL)
+    
+                    fileHandle.seekToEndOfFile()
+    
+                    if let data = entry.data(using: .utf8) {
+    
+                        fileHandle.write(data)
+    
+                    }
+    
+                    fileHandle.closeFile()
+    
+                } catch {
+    
+                    print("CRITICAL LOGGER ERROR: Could not write to log file \(logFileURL.path): \(error)")
+    
+                }
+    
             }
-            handle.closeFile()
+    
         }
-    }
-}
-
-// Global helper
-func log (_ msg: String) {
-    Logger.shared.log(msg)
-}
+    
+        
+    
+        // Global helper
+    
+        func log(_ msg: String) {
+    
+            Logger.shared.log(msg)
+    
+        }
 

@@ -178,7 +178,7 @@ struct OnboardingView: View {
             // Real call would use GeminiClient and CerebrasClient
             
             // Verify Gemini
-            let gemini = GeminiClient(apiKey: geminiApiKey)
+            _ = GeminiClient(apiKey: geminiApiKey)
             // We can't easily "ping" without a file, but we assume non-empty is a start.
             // For a real check, we'd try a text generation.
             // Let's assume valid if > 20 chars for prototype speed, or try a simple call if we had a text-only endpoint in client.

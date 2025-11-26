@@ -3,12 +3,13 @@ import Carbon
 
 struct ShortcutRecorder: View {
     @State private var isRecording = false
-    @State private var modifier: Int = 0
-    @State private var keyCode: Int = 0
     
     // Initial values loaded from UserDefaults or Defaults
-    @AppStorage("JarvisShortcutModifier") var savedModifier: Int = 4096 // Control
-    @AppStorage("JarvisShortcutKey") var savedKey: Int = 49 // Space
+    @AppStorage("JarvisShortcutModifier") var savedModifier: Int = Int(shiftKey) // Default Shift
+    @AppStorage("JarvisShortcutKey") var savedKey: Int = 49 // Default Space
+    
+    @State private var displayModifier: String = ""
+    @State private var displayKey: String = ""
     
     var body: some View {
         VStack {
@@ -16,32 +17,40 @@ struct ShortcutRecorder: View {
                 .font(.headline)
             
             HStack(spacing: 10) {
-                // Visual representation
                 Button(action: { isRecording = true }) {
-                    HStack {
+                    HStack(spacing: 5) {
                         if isRecording {
-                            Text("Press Combo...")
+                            Text("Press your shortcut combo...")
                                 .foregroundColor(.blue)
                         } else {
-                            Text(modString(savedModifier))
+                            Text(displayModifier)
+                                .font(.body)
                                 .fontWeight(.bold)
-                                .frame(width: 50, height: 40)
+                                .frame(minWidth: 40)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
                                 .background(Color.gray.opacity(0.2))
-                                .cornerRadius(8)
+                                .cornerRadius(6)
                             
                             Text("+")
                             
-                            Text(keyString(savedKey))
+                            Text(displayKey)
+                                .font(.body)
                                 .fontWeight(.bold)
-                                .frame(width: 50, height: 40)
+                                .frame(minWidth: 40)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
                                 .background(Color.gray.opacity(0.2))
-                                .cornerRadius(8)
+                                .cornerRadius(6)
                         }
                     }
                     .padding(8)
                     .background(RoundedRectangle(cornerRadius: 10).stroke(isRecording ? Color.blue : Color.gray, lineWidth: 2))
                 }
                 .buttonStyle(.plain)
+                .onAppear(perform: updateDisplay)
+                .onChange(of: savedModifier) { _ in updateDisplay() }
+                .onChange(of: savedKey) { _ in updateDisplay() }
                 
                 if isRecording {
                     Button("Cancel") { isRecording = false }
@@ -52,31 +61,45 @@ struct ShortcutRecorder: View {
             self.savedModifier = mod
             self.savedKey = key
             self.isRecording = false
-            
-            // Notify app to re-register hotkey immediately
+            log("New shortcut saved: Mod \(mod), Key \(key)")
             NotificationCenter.default.post(name: NSNotification.Name("ReloadHotkey"), object: nil)
         }))
     }
     
+    func updateDisplay() {
+        displayModifier = modString(savedModifier)
+        displayKey = keyString(savedKey)
+    }
+    
     func modString(_ carbonMod: Int) -> String {
         var s = ""
-        if (carbonMod & cmdKey) != 0 { s += "⌘" }
-        if (carbonMod & controlKey) != 0 { s += "⌃" }
-        if (carbonMod & optionKey) != 0 { s += "⌥" }
-        if (carbonMod & shiftKey) != 0 { s += "⇧" }
-        return s.isEmpty ? "?" : s
+        if (carbonMod & Int(cmdKey)) != 0 { s += "⌘" }
+        if (carbonMod & Int(controlKey)) != 0 { s += "⌃" }
+        if (carbonMod & Int(optionKey)) != 0 { s += "⌥" }
+        if (carbonMod & Int(shiftKey)) != 0 { s += "⇧" }
+        return s.isEmpty ? "None" : s
     }
     
     func keyString(_ code: Int) -> String {
-        // Mapping some common codes manually for display
+        // Simple virtual key code to string mapping for common keys
         switch code {
         case 49: return "Space"
-        case 36: return "Enter"
-        case 48: return "Tab"
+        case 36: return "Return"
         case 53: return "Esc"
+        case 48: return "Tab"
+        case 123: return "←"
+        case 124: return "→"
+        case 125: return "↓"
+        case 126: return "↑"
+        case 51: return "Delete"
+        case 117: return "Fwd Del"
+        case 115: return "Home"
+        case 119: return "End"
+        case 116: return "PgUp"
+        case 121: return "PgDn"
         default:
-            // Try to convert keycode to char (very rough)
-            return String(format: "%d", code)
+            // Attempt to get character from key code
+            return String(format: "%d", code) // Fallback to raw code
         }
     }
 }
@@ -96,6 +119,8 @@ struct KeySniffer: NSViewRepresentable {
         view.parent = self
         if isRecording {
             view.window?.makeFirstResponder(view)
+        } else {
+            view.window?.makeFirstResponder(nil) // Resign responder when not recording
         }
     }
 }
@@ -113,24 +138,28 @@ class KeySniffView: NSView {
         
         // Extract modifier flags
         var mod = 0
-        if event.modifierFlags.contains(.command) { mod |= cmdKey }
-        if event.modifierFlags.contains(.control) { mod |= controlKey }
-        if event.modifierFlags.contains(.option)  { mod |= optionKey }
-        if event.modifierFlags.contains(.shift)   { mod |= shiftKey }
+        if event.modifierFlags.contains(.command) { mod |= Int(cmdKey) }
+        if event.modifierFlags.contains(.control) { mod |= Int(controlKey) }
+        if event.modifierFlags.contains(.option)  { mod |= Int(optionKey) }
+        if event.modifierFlags.contains(.shift)   { mod |= Int(shiftKey) }
         
         let key = Int(event.keyCode)
         
-        // Don't record just a modifier press (wait for a key)
-        // But if they press a key with no modifiers, that's allowed but risky?
-        // Let's allow it.
+        // Prevent recording only modifier presses as the key
+        if key == Int(kVK_Shift) || key == Int(kVK_Control) || key == Int(kVK_Option) || key == Int(kVK_Command) {
+            log("Modifier-only key press detected, ignoring as primary key for shortcut.")
+            return
+        }
         
+        log("KeySniffer captured: Mod \(mod), Key \(key)")
         parent.onKey(mod, key)
     }
     
+    // Crucial: Suppress system beep for unhandled key presses
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if parent?.isRecording == true {
-            keyDown(with: event)
-            return true
+            keyDown(with: event) // Process it
+            return true // Indicate handled, suppress beep
         }
         return super.performKeyEquivalent(with: event)
     }
