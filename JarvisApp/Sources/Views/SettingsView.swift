@@ -118,11 +118,9 @@ struct HomeView: View {
 
 struct ChatMessageRow: View {
     var message: ChatMessage
-    
+
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            ToolMessageView(role: message.role, content: message.content, toolName: message.toolPayload?.name)
-        }
+        ToolMessageView(role: message.role, content: message.content, toolName: message.toolPayload?.name)
     }
 }
 
@@ -161,6 +159,7 @@ import ApplicationServices
 
 struct GeneralSettingsView: View {
     @AppStorage("openaiApiKey") var openaiApiKey: String = ""
+    @AppStorage("hfApiKey") var hfApiKey: String = ""
     
     @State private var micStatus: Bool = false
     @State private var accessStatus: Bool = false
@@ -169,6 +168,11 @@ struct GeneralSettingsView: View {
         Form {
             Section("API Keys") {
                 SecureField("OpenAI API Key", text: $openaiApiKey)
+                SecureField("Hugging Face Token", text: $hfApiKey)
+                Button("Check APIs") {
+                    Task { await validateKeys() }
+                }
+                .buttonStyle(.bordered)
             }
             
             Section("Shortcut") {
@@ -236,5 +240,10 @@ struct GeneralSettingsView: View {
     func checkAccess() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false]
         accessStatus = AXIsProcessTrustedWithOptions(options as CFDictionary)
+    }
+    
+    private func validateKeys() async {
+        let (openResult, hfResult) = await ApiValidator.validate(openaiKey: openaiApiKey, hfKey: hfApiKey)
+        log("API validation - OpenAI: \(openResult), HF: \(hfResult)")
     }
 }

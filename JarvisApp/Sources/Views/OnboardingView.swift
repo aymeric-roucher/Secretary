@@ -12,28 +12,6 @@ struct OnboardingView: View {
     @State private var micStatus: ValidationStatus = .none
     @State private var accessStatus: ValidationStatus = .none
     
-    enum ValidationStatus {
-        case none, checking, valid, invalid
-        
-        var icon: String {
-            switch self {
-            case .none: return "circle"
-            case .checking: return "hourglass"
-            case .valid: return "checkmark.circle.fill"
-            case .invalid: return "xmark.circle.fill"
-            }
-        }
-        
-        var color: Color {
-            switch self {
-            case .none: return .gray
-            case .checking: return .yellow
-            case .valid: return .green
-            case .invalid: return .red
-            }
-        }
-    }
-    
     var body: some View {
         VStack(spacing: 18) {
             VStack(spacing: 4) {
@@ -56,24 +34,11 @@ struct OnboardingView: View {
             .shadow(color: .black.opacity(0.03), radius: 6, x: 0, y: 3)
             
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("API Keys")
-                        .font(.system(size: 17, weight: .semibold, design: .rounded))
-                    Spacer()
-                }
-                HStack {
-                    SecureField("OpenAI API Key", text: $openaiApiKey)
-                        .onChange(of: openaiApiKey) { _, _ in openaiStatus = .none }
-                    StatusIcon(status: openaiStatus)
-                }
-                HStack {
-                    SecureField("Hugging Face Token", text: $hfApiKey)
-                        .onChange(of: hfApiKey) { _, _ in hfStatus = .none }
-                    StatusIcon(status: hfStatus)
-                }
-                Button("Check APIs") { validateKeys() }
-                    .buttonStyle(.bordered)
-                    .padding(.top, 4)
+                ApiKeysSection(openaiKey: $openaiApiKey,
+                               hfKey: $hfApiKey,
+                               openaiStatus: $openaiStatus,
+                               hfStatus: $hfStatus,
+                               onValidate: { Task { await validateKeys() } })
             }
             .padding(14)
             .background(Color(nsColor: .textBackgroundColor))
@@ -81,23 +46,10 @@ struct OnboardingView: View {
             .shadow(color: .black.opacity(0.03), radius: 6, x: 0, y: 3)
             
             VStack(alignment: .leading, spacing: 12) {
-                Text("Permissions")
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
-                HStack {
-                    Image(systemName: "mic.fill")
-                    Text("Microphone")
-                    Spacer()
-                    StatusIcon(status: micStatus)
-                    Button("Request") { requestMic() }
-                        .disabled(micStatus == .valid)
-                }
-                HStack {
-                    Image(systemName: "keyboard.fill")
-                    Text("Accessibility (Typing)")
-                    Spacer()
-                    StatusIcon(status: accessStatus)
-                    Button("Check") { checkAccessibility() }
-                }
+                PermissionsSection(micStatus: $micStatus,
+                                   accessStatus: $accessStatus,
+                                   requestMic: requestMic,
+                                   checkAccess: checkAccessibility)
             }
             .padding(14)
             .background(Color(nsColor: .textBackgroundColor))
@@ -108,13 +60,13 @@ struct OnboardingView: View {
                 Spacer()
                 Button("Finish") {
                     NotificationCenter.default.post(name: NSNotification.Name("ReloadHotkey"), object: nil)
-                    validateAllAndFinish()
+                    isCompleted = true
                 }
                 .buttonStyle(.borderedProminent)
             }
         }
         .padding(24)
-        .frame(width: 480, height: 720)
+        .frame(width: 520, height: 740)
         .background(Color(nsColor: .underPageBackgroundColor))
         .onAppear {
             loadEnv()
@@ -149,15 +101,20 @@ struct OnboardingView: View {
         }
     }
     
-    func validateKeys() {
-        openaiStatus = openaiApiKey.count > 20 ? .valid : .invalid
-        hfStatus = hfApiKey.count > 20 ? .valid : .invalid
+    func validateKeys() async {
+        openaiStatus = .checking
+        hfStatus = .checking
+        let (openResult, hfResult) = await ApiValidator.validate(openaiKey: openaiApiKey, hfKey: hfApiKey)
+        openaiStatus = openResult == .valid ? .valid : .invalid
+        hfStatus = hfResult == .valid ? .valid : .invalid
     }
     
     func validateAllAndFinish() {
-        validateKeys()
-        if openaiStatus == .valid && hfStatus == .valid && micStatus == .valid && accessStatus == .valid {
-            isCompleted = true
+        Task {
+            await validateKeys()
+            if openaiStatus == .valid && hfStatus == .valid && micStatus == .valid && accessStatus == .valid {
+                isCompleted = true
+            }
         }
     }
     
@@ -192,14 +149,5 @@ struct OnboardingView: View {
             // It will prompt. User has to go to settings.
             // We can re-check after a delay or user click.
         }
-    }
-}
-
-struct StatusIcon: View {
-    var status: OnboardingView.ValidationStatus
-    
-    var body: some View {
-        Image(systemName: status.icon)
-            .foregroundColor(status.color)
     }
 }

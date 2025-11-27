@@ -24,6 +24,7 @@ struct LogsView: View {
             ScrollView {
                 Text(logContent)
                     .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

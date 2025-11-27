@@ -7,7 +7,7 @@ struct ToolMessageView: View {
 
     private static let toolIcons: [String: String] = [
         "type": "hand.point.up.left.fill",
-        "deep_research": "telescope.fill",
+        "deep_research": "magnifyingglass",
         "open_app": "macwindow",
         "switch_to": "arrow.triangle.2.circlepath"
     ]
