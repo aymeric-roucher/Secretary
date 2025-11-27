@@ -56,8 +56,6 @@ struct OnboardingView: View {
                                    checkAccess: checkAccessibility)
             }
 
-            Spacer()
-
             HStack {
                 Spacer()
                 Button("Finish") {
@@ -68,7 +66,8 @@ struct OnboardingView: View {
             }
         }
         .padding(32)
-        .frame(width: 520, height: 680)
+        .frame(maxWidth: 500)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .background(Theme.background)
         .onAppear {
             loadAPIKeys(openaiKey: &openaiApiKey, hfKey: &hfApiKey)

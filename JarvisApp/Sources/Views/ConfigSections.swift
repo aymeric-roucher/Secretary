@@ -99,6 +99,7 @@ struct PermissionsSection: View {
             .padding(12)
             .background(Theme.inputBackground)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
+            .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius).stroke(Theme.borderColor, lineWidth: 1))
 
             HStack {
                 Image(systemName: "keyboard.fill")
@@ -113,6 +114,7 @@ struct PermissionsSection: View {
             .padding(12)
             .background(Theme.inputBackground)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
+            .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius).stroke(Theme.borderColor, lineWidth: 1))
         }
     }
 }

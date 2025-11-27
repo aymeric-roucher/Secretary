@@ -65,7 +65,7 @@ struct SidebarButton: View {
             .frame(maxWidth: .infinity)
             .contentShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ThemeButtonStyle())
         .background(selection == tab ? Theme.textColor.opacity(0.08) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
         .foregroundColor(Theme.textColor)
@@ -103,14 +103,32 @@ struct HomeView: View {
         return f
     }()
 
+    private var totalWordCount: Int {
+        appState.messages
+            .filter { $0.role == .user }
+            .reduce(0) { $0 + $1.content.split(separator: " ").count }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Home")
-                .font(Theme.titleFont)
-                .foregroundColor(Theme.textColor)
-                .padding(.top, 24)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 16)
+            HStack(alignment: .center) {
+                Text("Home")
+                    .font(Theme.titleFont)
+                    .foregroundColor(Theme.textColor)
+                Spacer()
+                if totalWordCount > 0 {
+                    Text("\(totalWordCount) words")
+                        .font(Theme.smallFont)
+                        .foregroundColor(Theme.secondaryText)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Theme.inputBackground)
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(.top, 24)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 16)
 
             if groupedMessages.isEmpty {
                 Spacer()
@@ -233,6 +251,7 @@ struct DictionaryView: View {
                     addButton
                     if isEditorVisible { entryForm }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 24)
             }
@@ -280,7 +299,7 @@ struct DictionaryView: View {
                         .background(Theme.inputBackground)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ThemeButtonStyle())
                 }
             }
         }

@@ -152,6 +152,7 @@ struct ThemeButtonStyle: ButtonStyle {
             .padding(.vertical, 6)
             .background(configuration.isPressed ? Theme.borderColor : Theme.buttonBackground)
             .clipShape(Capsule())
+            .overlay(Capsule().stroke(Theme.borderColor, lineWidth: 1))
     }
 }
 
@@ -164,6 +165,7 @@ struct ThemePrimaryButtonStyle: ButtonStyle {
             .padding(.vertical, 10)
             .background(configuration.isPressed ? Color(white: 0.2) : Theme.textColor)
             .clipShape(Capsule())
+            .overlay(Capsule().stroke(Theme.borderColor, lineWidth: 1))
     }
 }
 

@@ -29,6 +29,7 @@ struct ShortcutRecorder: View {
                             .padding(.vertical, 5)
                             .background(Theme.buttonBackground)
                             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
+                            .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius).stroke(Theme.borderColor, lineWidth: 1))
 
                         Text("+")
                             .foregroundColor(Theme.secondaryText)
@@ -42,6 +43,7 @@ struct ShortcutRecorder: View {
                             .padding(.vertical, 5)
                             .background(Theme.buttonBackground)
                             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
+                            .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius).stroke(Theme.borderColor, lineWidth: 1))
                     }
                 }
                 .padding(8)
@@ -55,6 +57,7 @@ struct ShortcutRecorder: View {
             
             if isRecording {
                 Button("Cancel") { isRecording = false }
+                    .buttonStyle(ThemeButtonStyle())
             }
             
             HStack(spacing: 6) {
@@ -63,8 +66,8 @@ struct ShortcutRecorder: View {
                     .frame(width: 10, height: 10)
                     .animation(.easeInOut(duration: 0.15), value: pressedFlash)
                 Text("Shortcut pressed")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(Theme.smallFont)
+                    .foregroundColor(Theme.secondaryText)
             }
         }
         .background(KeySniffer(isRecording: $isRecording, onKey: { mod, key in

@@ -60,6 +60,7 @@ struct JarvisApp: App {
             }
         }
         .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 800, height: 600)
         .handlesExternalEvents(matching: Set(arrayLiteral: "settings"))
     }
 }
