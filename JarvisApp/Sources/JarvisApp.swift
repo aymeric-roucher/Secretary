@@ -234,17 +234,11 @@ class AppState: ObservableObject {
                     popupToolMessage = toolMsg
                     messages.append(toolMsg)
 
-                    // For typing, hide immediately to return focus
-                    if toolCall.tool_name == "type" {
-                        isProcessing = false
-                        hideSpotlight()
-                    }
+                    // Execute the tool
                     self.toolManager.execute(toolName: toolCall.tool_name, args: toolCall.tool_arguments)
 
-                    // For non-typing tools, show completion then hide
-                    if toolCall.tool_name != "type" {
-                        await completeAndHidePopup()
-                    }
+                    // Show completion then hide after delay
+                    await completeAndHidePopup()
                 } else {
                     pushMessage(role: .system, content: "Could not understand the command.")
                     log("Cerebras returned no tool call.")
@@ -259,10 +253,10 @@ class AppState: ObservableObject {
     }
 
     @MainActor
-    private func completeAndHidePopup() async {
+    private func completeAndHidePopup(delay: UInt64 = 1_500_000_000) async {
         isProcessing = false
         isCompleted = true
-        try? await Task.sleep(nanoseconds: 700_000_000) // 0.7 seconds
+        try? await Task.sleep(nanoseconds: delay)
         hideSpotlight()
     }
     

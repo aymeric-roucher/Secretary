@@ -108,7 +108,7 @@ final class MenuPopupManager {
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = true
-        panel.hidesOnDeactivate = true
+        panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
 
         hosting.view.layoutSubtreeIfNeeded()
