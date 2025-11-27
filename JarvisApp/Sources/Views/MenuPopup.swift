@@ -47,7 +47,7 @@ final class MenuPopupManager {
         panel.isOpaque = false
         panel.hasShadow = true
         panel.hidesOnDeactivate = true
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
         panel.setFrame(NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight), display: false)
         positionPanel(panel)
         panel.orderFrontRegardless()
@@ -61,7 +61,8 @@ final class MenuPopupManager {
     
     private func positionPanel(_ panel: NSPanel) {
         if let screen = NSScreen.main {
-            let origin = NSPoint(x: screen.visibleFrame.maxX - panelWidth - 12, y: screen.visibleFrame.maxY - panelHeight - 6)
+            let origin = NSPoint(x: screen.visibleFrame.maxX - panelWidth - 12,
+                                 y: screen.visibleFrame.minY + 20)
             panel.setFrameOrigin(origin)
         }
     }
