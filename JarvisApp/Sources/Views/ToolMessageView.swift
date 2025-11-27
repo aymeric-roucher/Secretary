@@ -5,16 +5,9 @@ struct ToolMessageView: View {
     var content: String
     var toolName: String?
 
-    private static let toolIcons: [String: String] = [
-        "type": "pencil.and.line",
-        "deep_research": "magnifyingglass",
-        "open_app": "desktopcomputer",
-        "switch_to": "arrow.triangle.2.circlepath"
-    ]
-
     private var iconName: String {
         switch role {
-        case .tool: return Self.toolIcons[toolName ?? ""] ?? "hammer.fill"
+        case .tool: return Theme.toolIcon(for: toolName)
         case .user: return "waveform"
         case .assistant, .system: return "info.circle.fill"
         }

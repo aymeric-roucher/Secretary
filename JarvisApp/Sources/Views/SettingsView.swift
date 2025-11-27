@@ -6,80 +6,68 @@ struct SettingsView: View {
     var body: some View {
         HStack(spacing: 0) {
             // Sidebar
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text("JARVIS")
-                    .font(.custom("Georgia", size: 11))
-                    .fontWeight(.bold)
-                    .foregroundColor(.gray)
+                    .font(Theme.captionFont)
+                    .foregroundColor(Theme.secondaryText)
                     .tracking(1.5)
                     .padding(.horizontal, 16)
-                    .padding(.top, 24)
+                    .padding(.top, 52)
+                    .padding(.bottom, 16)
 
-                SidebarButton(title: "Home", tab: .home, selection: $appState.selectedTab)
-                SidebarButton(title: "Logs", tab: .logs, selection: $appState.selectedTab)
-                SidebarButton(title: "Dictionary", tab: .dictionary, selection: $appState.selectedTab)
-                SidebarButton(title: "Style", tab: .style, selection: $appState.selectedTab)
+                SidebarButton(title: "Home", icon: "house", tab: .home, selection: $appState.selectedTab)
+                SidebarButton(title: "Logs", icon: "doc.text", tab: .logs, selection: $appState.selectedTab)
+                SidebarButton(title: "Dictionary", icon: "book", tab: .dictionary, selection: $appState.selectedTab)
+                SidebarButton(title: "Style", icon: "textformat", tab: .style, selection: $appState.selectedTab)
 
                 Spacer()
 
-                Text("SETTINGS")
-                    .font(.custom("Georgia", size: 11))
-                    .fontWeight(.bold)
-                    .foregroundColor(.gray)
-                    .tracking(1.5)
-                    .padding(.horizontal, 16)
+                Divider().overlay(Theme.borderColor)
 
-                SidebarButton(title: "Settings", tab: .settings, selection: $appState.selectedTab)
-                    .padding(.bottom, 24)
+                SidebarButton(title: "Settings", icon: "gearshape", tab: .settings, selection: $appState.selectedTab)
             }
             .frame(width: 180)
-            .background(Color(white: 0.97))
+            .background(Theme.sidebarBackground)
 
-            Rectangle()
-                .fill(Color(white: 0.85))
-                .frame(width: 1)
+            Rectangle().fill(Theme.borderColor).frame(width: 1)
 
             // Content Area
             VStack {
                 switch appState.selectedTab {
-                case .home:
-                    HomeView()
-                case .logs:
-                    LogsView()
-                case .dictionary:
-                    DictionaryView()
-                case .style:
-                    StyleView()
-                case .settings:
-                    GeneralSettingsView()
+                case .home: HomeView()
+                case .logs: LogsView()
+                case .dictionary: DictionaryView()
+                case .style: StyleView()
+                case .settings: GeneralSettingsView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.white)
         }
+        .background(Theme.background)
     }
 }
 
 struct SidebarButton: View {
     let title: String
+    let icon: String
     let tab: SettingsTab
     @Binding var selection: SettingsTab
 
     var body: some View {
         Button(action: { selection = tab }) {
-            HStack {
-                Text(title)
-                    .font(.custom("Georgia", size: 14))
+            HStack(spacing: 10) {
+                Image(systemName: icon).font(.system(size: 14)).frame(width: 18)
+                Text(title).font(Theme.bodyFont)
                 Spacer()
             }
-            .padding(.vertical, 10)
+            .padding(.vertical, 12)
             .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(selection == tab ? Color.black.opacity(0.05) : Color.clear)
-        .foregroundColor(selection == tab ? .black : .gray)
-        .padding(.horizontal, 8)
+        .background(selection == tab ? Theme.textColor.opacity(0.08) : Color.clear)
+        .foregroundColor(Theme.textColor)
     }
 }
 
@@ -140,6 +128,7 @@ struct HomeView: View {
                         VStack(alignment: .leading, spacing: 0) {
                             ForEach(Array(groupedMessages.enumerated()), id: \.element.user.id) { _, group in
                                 Divider()
+                                    .overlay(Color(white: 0.75))
                                     .padding(.vertical, 16)
                                 MessageGroupRow(
                                     userMessage: group.user,
@@ -169,33 +158,22 @@ struct MessageGroupRow: View {
     let toolMessage: ChatMessage?
     let timeFormatter: DateFormatter
 
-    private static let toolIcons: [String: String] = [
-        "type": "pencil.and.line",
-        "deep_research": "magnifyingglass",
-        "open_app": "desktopcomputer",
-        "switch_to": "arrow.triangle.2.circlepath"
-    ]
-
-    private func toolIcon(for name: String?) -> String {
-        Self.toolIcons[name ?? ""] ?? "hammer.fill"
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 8) {
                 Text(timeFormatter.string(from: userMessage.timestamp))
-                    .font(.custom("Georgia", size: 13))
-                    .foregroundColor(.gray)
+                    .font(Theme.smallFont)
+                    .foregroundColor(Theme.secondaryText)
                     .frame(width: 40, alignment: .leading)
 
                 Image(systemName: "waveform")
                     .font(.system(size: 12))
-                    .foregroundColor(.gray)
+                    .foregroundColor(Theme.secondaryText)
                     .frame(width: 16)
 
                 Text(userMessage.content)
                     .font(.custom("Georgia", size: 15))
-                    .foregroundColor(.black)
+                    .foregroundColor(Theme.textColor)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
@@ -204,21 +182,21 @@ struct MessageGroupRow: View {
                     Text("")
                         .frame(width: 40)
 
-                    Image(systemName: toolIcon(for: tool.toolPayload?.name))
-                        .font(.system(size: 12))
-                        .foregroundColor(.gray)
+                    Text("\u{21B3}")
+                        .font(.custom("Georgia", size: 15))
+                        .foregroundColor(Theme.secondaryText)
                         .frame(width: 16)
 
-                    HStack(alignment: .top, spacing: 6) {
-                        Text("\u{21B3}")
-                            .font(.custom("Georgia", size: 15))
-                            .foregroundColor(.gray)
+                    Image(systemName: Theme.toolIcon(for: tool.toolPayload?.name))
+                        .font(.system(size: 12))
+                        .foregroundColor(Theme.secondaryText)
+                        .frame(width: 16)
 
-                        Text(tool.content)
-                            .font(.custom("Georgia", size: 14))
-                            .foregroundColor(.gray)
-                            .italic()
-                    }
+                    Text(tool.content)
+                        .font(Theme.bodyFont)
+                        .foregroundColor(Theme.secondaryText)
+                        .italic()
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
@@ -227,16 +205,19 @@ struct MessageGroupRow: View {
 
 struct DictionaryView: View {
     @StateObject private var store = DictionaryStore()
-    @State private var newWord: String = ""
-    @State private var newInput: String = ""
-    @State private var newOutput: String = ""
+    @State private var isEditorVisible = false
+    @State private var editingEntry: DictionaryEntry?
+    @State private var inputText: String = ""
+    @State private var outputText: String = ""
+    @State private var isCorrection: Bool = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
-                entryForm
                 entryList
+                addButton
+                if isEditorVisible { entryForm }
             }
             .padding(24)
         }
@@ -255,118 +236,153 @@ struct DictionaryView: View {
         }
     }
 
-    private var entryForm: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("New Word")
-                    .font(.custom("Georgia", size: 14))
-                    .fontWeight(.semibold)
-                    .foregroundColor(.black)
-                HStack(spacing: 12) {
-                    TextField("e.g. Eylul", text: $newWord)
-                        .textFieldStyle(.plain)
-                        .font(.custom("Georgia", size: 14))
-                        .padding(10)
-                        .background(Color(white: 0.97))
-                        .overlay(Rectangle().stroke(Color(white: 0.85), lineWidth: 1))
-                    Button("Add") {
-                        store.addWord(newWord)
-                        newWord = ""
-                    }
-                    .font(.custom("Georgia", size: 13))
-                    .buttonStyle(.bordered)
-                    .disabled(newWord.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("New Abbreviation / Correction")
-                    .font(.custom("Georgia", size: 14))
-                    .fontWeight(.semibold)
-                    .foregroundColor(.black)
-                HStack(spacing: 12) {
-                    TextField("From (e.g. teh)", text: $newInput)
-                        .textFieldStyle(.plain)
-                        .font(.custom("Georgia", size: 14))
-                        .padding(10)
-                        .background(Color(white: 0.97))
-                        .overlay(Rectangle().stroke(Color(white: 0.85), lineWidth: 1))
-                    Text("\u{2192}")
-                        .font(.custom("Georgia", size: 14))
-                        .foregroundColor(.gray)
-                    TextField("To (e.g. the)", text: $newOutput)
-                        .textFieldStyle(.plain)
-                        .font(.custom("Georgia", size: 14))
-                        .padding(10)
-                        .background(Color(white: 0.97))
-                        .overlay(Rectangle().stroke(Color(white: 0.85), lineWidth: 1))
-                    Button("Add") {
-                        store.addCorrection(from: newInput, to: newOutput)
-                        newInput = ""
-                        newOutput = ""
-                    }
-                    .font(.custom("Georgia", size: 13))
-                    .buttonStyle(.bordered)
-                    .disabled(newInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                              newOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
-        }
-    }
-
     private var entryList: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Entries")
-                    .font(.custom("Georgia", size: 16))
-                    .fontWeight(.semibold)
-                    .foregroundColor(.black)
-                Spacer()
-                if store.entries.isEmpty {
-                    Text("No entries yet")
-                        .font(.custom("Georgia", size: 13))
-                        .foregroundColor(.gray)
-                        .italic()
-                }
-            }
-            ForEach(store.entries) { entry in
-                HStack(spacing: 12) {
-                    if entry.kind == .correction {
-                        Text(entry.input)
-                            .font(.custom("Georgia", size: 14))
-                            .foregroundColor(.black)
-                        Text("\u{2192}")
-                            .font(.custom("Georgia", size: 14))
-                            .foregroundColor(.gray)
-                        Text(entry.output ?? "")
-                            .font(.custom("Georgia", size: 14))
-                            .foregroundColor(.black)
-                    } else {
-                        Text(entry.input)
-                            .font(.custom("Georgia", size: 14))
-                            .foregroundColor(.black)
-                    }
-                    Spacer()
+            Text("Entries")
+                .font(.custom("Georgia", size: 16))
+                .fontWeight(.semibold)
+                .foregroundColor(.black)
+            if store.entries.isEmpty {
+                Text("Nothing added yet.")
+                    .font(.custom("Georgia", size: 13))
+                    .foregroundColor(.gray)
+                    .italic()
+            } else {
+                ForEach(store.entries) { entry in
                     Button {
-                        store.remove(entry)
+                        openEditor(for: entry)
                     } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 11))
-                            .foregroundColor(.gray)
+                        HStack(spacing: 12) {
+                            if entry.kind == .correction {
+                                Text(entry.input)
+                                    .font(.custom("Georgia", size: 14))
+                                    .foregroundColor(.black)
+                                Text("→")
+                                    .font(.custom("Georgia", size: 14))
+                                    .foregroundColor(.gray)
+                                Text(entry.output ?? "")
+                                    .font(.custom("Georgia", size: 14))
+                                    .foregroundColor(.black)
+                            } else {
+                                Text(entry.input)
+                                    .font(.custom("Georgia", size: 14))
+                                    .foregroundColor(.black)
+                            }
+                            Spacer()
+                            Image(systemName: "pencil")
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(Color(white: 0.97))
+                        .cornerRadius(10)
                     }
                     .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(Color(white: 0.97))
-                .overlay(Rectangle().stroke(Color(white: 0.9), lineWidth: 1))
             }
         }
     }
-}
 
+    private var addButton: some View {
+        Button {
+            openEditor(for: nil)
+        } label: {
+            Label("Add element", systemImage: "plus.circle.fill")
+                .font(.custom("Georgia", size: 14))
+        }
+        .buttonStyle(.borderedProminent)
+    }
+
+    private var entryForm: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(editingEntry == nil ? "Add entry" : "Edit entry")
+                    .font(.custom("Georgia", size: 15))
+                    .fontWeight(.semibold)
+                Spacer()
+                Button("Cancel") { isEditorVisible = false }
+                    .buttonStyle(.borderless)
+            }
+
+            Toggle(isOn: $isCorrection) {
+                Text("Make it a correction")
+                    .font(.custom("Georgia", size: 14))
+                    .foregroundColor(.black)
+            }
+            .toggleStyle(.switch)
+
+            if isCorrection {
+                HStack(spacing: 8) {
+                    ThemedTextArea(placeholder: "From (e.g. teh)", text: $inputText, height: 60)
+                    Text("→")
+                        .font(.custom("Georgia", size: 14))
+                        .foregroundColor(.gray)
+                        .frame(width: 24)
+                    ThemedTextArea(placeholder: "To (e.g. the)", text: $outputText, height: 60)
+                }
+            } else {
+                ThemedTextArea(placeholder: "Word to keep (e.g. Eylul)", text: $inputText, height: 60)
+            }
+
+            HStack {
+                Spacer()
+                Button("Save") {
+                    saveEntry()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(saveDisabled)
+            }
+        }
+        .padding(14)
+        .background(Color(white: 0.98))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
+    }
+
+    private func openEditor(for entry: DictionaryEntry?) {
+        editingEntry = entry
+        if let entry = entry {
+            inputText = entry.input
+            outputText = entry.output ?? ""
+            isCorrection = entry.kind == .correction
+        } else {
+            inputText = ""
+            outputText = ""
+            isCorrection = false
+        }
+        isEditorVisible = true
+    }
+
+    private var saveDisabled: Bool {
+        let trimmedInput = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedOutput = outputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if isCorrection {
+            return trimmedInput.isEmpty || trimmedOutput.isEmpty
+        }
+        return trimmedInput.isEmpty
+    }
+
+    private func saveEntry() {
+        let trimmedInput = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedOutput = outputText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let entry = editingEntry {
+            let updated = DictionaryEntry(id: entry.id,
+                                          kind: isCorrection ? .correction : .word,
+                                          input: trimmedInput,
+                                          output: isCorrection ? trimmedOutput : nil)
+            store.update(updated)
+        } else {
+            if isCorrection {
+                store.addCorrection(from: trimmedInput, to: trimmedOutput)
+            } else {
+                store.addWord(trimmedInput)
+            }
+        }
+
+        isEditorVisible = false
+    }
+}
 struct StyleView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -384,11 +400,7 @@ struct StyleView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 16)
 
-            TextEditor(text: .constant("Hi [Name],\n\nThanks for reaching out..."))
-                .font(.custom("Georgia", size: 14))
-                .padding(16)
-                .background(Color(white: 0.97))
-                .overlay(Rectangle().stroke(Color(white: 0.85), lineWidth: 1))
+            ThemedTextArea(placeholder: "", text: .constant("Hi [Name],\n\nThanks for reaching out..."), height: 220)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 24)
         }
@@ -403,93 +415,89 @@ import ApplicationServices
 struct GeneralSettingsView: View {
     @AppStorage("openaiApiKey") var openaiApiKey: String = ""
     @AppStorage("hfApiKey") var hfApiKey: String = ""
-    
-    @State private var micStatus: Bool = false
-    @State private var accessStatus: Bool = false
-    
+
+    @State private var openaiStatus: ValidationStatus = .none
+    @State private var hfStatus: ValidationStatus = .none
+    @State private var micStatus: ValidationStatus = .none
+    @State private var accessStatus: ValidationStatus = .none
+
     var body: some View {
-        Form {
-            Section("API Keys") {
-                SecureField("OpenAI API Key", text: $openaiApiKey)
-                SecureField("Hugging Face Token", text: $hfApiKey)
-                Button("Check APIs") {
-                    Task { await validateKeys() }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                Text("Settings").font(Theme.titleFont).foregroundColor(Theme.textColor)
+
+                ApiKeysSection(
+                    openaiKey: $openaiApiKey,
+                    hfKey: $hfApiKey,
+                    openaiStatus: $openaiStatus,
+                    hfStatus: $hfStatus,
+                    onApiKeysValidate: { Task { await validateKeys() } }
+                )
+
+                Divider().overlay(Theme.borderColor)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Shortcut").font(Theme.headingFont).foregroundColor(Theme.textColor)
+                    ShortcutRecorder().frame(height: 50)
                 }
-                .buttonStyle(.bordered)
-            }
-            
-            Section("Shortcut") {
-                ShortcutRecorder()
-                    .frame(height: 60)
-            }
-            
-            Section("Permissions") {
-                HStack {
-                    Image(systemName: "mic.fill")
-                    Text("Microphone")
-                    Spacer()
-                    Image(systemName: micStatus ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundColor(micStatus ? .green : .red)
-                    Button("Check") { checkMic() }
-                }
-                
-                HStack {
-                    Image(systemName: "keyboard.fill")
-                    Text("Accessibility")
-                    Spacer()
-                    Image(systemName: accessStatus ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundColor(accessStatus ? .green : .red)
-                    Button("Check") { checkAccess() }
+
+                Divider().overlay(Theme.borderColor)
+
+                PermissionsSection(
+                    micStatus: $micStatus,
+                    accessStatus: $accessStatus,
+                    requestMic: requestMic,
+                    checkAccess: checkAccessibility
+                )
+
+                Divider().overlay(Theme.borderColor)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("About").font(Theme.headingFont).foregroundColor(Theme.textColor)
+                    Text("Jarvis v1.0").font(Theme.bodyFont).foregroundColor(Theme.secondaryText).italic()
                 }
             }
-            
-            Section("About") {
-                Text("Jarvis v1.0")
-            }
+            .padding(24)
         }
-        .padding()
-        .formStyle(.grouped)
+        .background(Theme.background)
         .onAppear {
             loadAPIKeys(openaiKey: &openaiApiKey, hfKey: &hfApiKey)
-            checkMic()
-            checkAccess()
+            checkPermissions()
         }
     }
-    
-    func checkMic() {
-        NSApp.activate(ignoringOtherApps: true)
-        let status = AVCaptureDevice.authorizationStatus(for: .audio)
-        switch status {
-        case .authorized:
-            micStatus = true
-            NSApp.activate(ignoringOtherApps: true)
-        case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .audio) { granted in
-                DispatchQueue.main.async {
-                    micStatus = granted
-                    NSApp.activate(ignoringOtherApps: true)
-                }
-            }
-        case .denied, .restricted:
-            micStatus = false
-            // Optionally open settings:
-            // if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
-            //    NSWorkspace.shared.open(url)
-            // }
-        @unknown default:
-            micStatus = false
-        }
-    }
-    
-    func checkAccess() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false]
-        accessStatus = AXIsProcessTrustedWithOptions(options as CFDictionary)
-    }
-    
+
     private func validateKeys() async {
+        openaiStatus = .checking
+        hfStatus = .checking
         async let openResult = ApiValidator.validateOpenAI(openaiKey: openaiApiKey)
         async let hfResult = ApiValidator.validateHF(hfKey: hfApiKey)
         let (open, hf) = await (openResult, hfResult)
-        log("API validation - OpenAI: \(open), HF: \(hf)")
+        openaiStatus = open == .valid ? .valid : .invalid
+        hfStatus = hf == .valid ? .valid : .invalid
+    }
+
+    private func checkPermissions() {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized: micStatus = .valid
+        case .denied, .restricted: micStatus = .invalid
+        case .notDetermined: micStatus = .none
+        @unknown default: micStatus = .none
+        }
+
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false]
+        accessStatus = AXIsProcessTrustedWithOptions(options as CFDictionary) ? .valid : .none
+    }
+
+    private func requestMic() {
+        AVCaptureDevice.requestAccess(for: .audio) { granted in
+            DispatchQueue.main.async {
+                micStatus = granted ? .valid : .invalid
+            }
+        }
+    }
+
+    private func checkAccessibility() {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        accessStatus = AXIsProcessTrustedWithOptions(options as CFDictionary) ? .valid : .none
     }
 }

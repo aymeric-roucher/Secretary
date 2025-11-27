@@ -59,6 +59,7 @@ struct JarvisApp: App {
                 OnboardingView(isCompleted: $hasCompletedOnboarding)
             }
         }
+        .windowStyle(.hiddenTitleBar)
         .handlesExternalEvents(matching: Set(arrayLiteral: "settings"))
     }
 }

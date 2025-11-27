@@ -30,25 +30,43 @@ struct ApiKeysSection: View {
     @Binding var openaiStatus: ValidationStatus
     @Binding var hfStatus: ValidationStatus
     var onApiKeysValidate: () -> Void
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("API Keys")
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                Text("API Keys").font(Theme.headingFont).foregroundColor(Theme.textColor)
                 Spacer()
-                Button("Check APIs") { onApiKeysValidate() }
-                    .buttonStyle(.bordered)
+                Button("Check APIs") { onApiKeysValidate() }.buttonStyle(ThemeButtonStyle())
             }
-            HStack {
-                SecureField("OpenAI API Key", text: $openaiKey)
-                    .onChange(of: openaiKey) { _, _ in openaiStatus = .none }
-                StatusIcon(status: openaiStatus)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("OpenAI API Key").font(Theme.smallFont).foregroundColor(Theme.secondaryText)
+                HStack {
+                    SecureField("sk-...", text: $openaiKey)
+                        .textFieldStyle(.plain)
+                        .font(Theme.bodyFont)
+                        .foregroundColor(Theme.textColor)
+                        .padding(10)
+                        .background(Theme.inputBackground)
+                        .overlay(Rectangle().stroke(Theme.borderColor, lineWidth: 1))
+                        .onChange(of: openaiKey) { _, _ in openaiStatus = .none }
+                    StatusIcon(status: openaiStatus)
+                }
             }
-            HStack {
-                SecureField("Hugging Face Token", text: $hfKey)
-                    .onChange(of: hfKey) { _, _ in hfStatus = .none }
-                StatusIcon(status: hfStatus)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Hugging Face Token").font(Theme.smallFont).foregroundColor(Theme.secondaryText)
+                HStack {
+                    SecureField("hf_...", text: $hfKey)
+                        .textFieldStyle(.plain)
+                        .font(Theme.bodyFont)
+                        .foregroundColor(Theme.textColor)
+                        .padding(10)
+                        .background(Theme.inputBackground)
+                        .overlay(Rectangle().stroke(Theme.borderColor, lineWidth: 1))
+                        .onChange(of: hfKey) { _, _ in hfStatus = .none }
+                    StatusIcon(status: hfStatus)
+                }
             }
         }
     }
@@ -59,26 +77,40 @@ struct PermissionsSection: View {
     @Binding var accessStatus: ValidationStatus
     var requestMic: () -> Void
     var checkAccess: () -> Void
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Permissions")
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
+            Text("Permissions").font(Theme.headingFont).foregroundColor(Theme.textColor)
+
             HStack {
                 Image(systemName: "mic.fill")
-                Text("Microphone")
+                    .font(.system(size: 14))
+                    .foregroundColor(Theme.textColor)
+                    .frame(width: 20)
+                Text("Microphone").font(Theme.bodyFont).foregroundColor(Theme.textColor)
                 Spacer()
                 StatusIcon(status: micStatus)
                 Button("Request") { requestMic() }
+                    .buttonStyle(ThemeButtonStyle(disabled: micStatus == .valid))
                     .disabled(micStatus == .valid)
             }
+            .padding(12)
+            .background(Theme.inputBackground)
+            .overlay(Rectangle().stroke(Theme.borderColor, lineWidth: 1))
+
             HStack {
                 Image(systemName: "keyboard.fill")
-                Text("Accessibility (Typing)")
+                    .font(.system(size: 14))
+                    .foregroundColor(Theme.textColor)
+                    .frame(width: 20)
+                Text("Accessibility (Typing)").font(Theme.bodyFont).foregroundColor(Theme.textColor)
                 Spacer()
                 StatusIcon(status: accessStatus)
-                Button("Check") { checkAccess() }
+                Button("Check") { checkAccess() }.buttonStyle(ThemeButtonStyle())
             }
+            .padding(12)
+            .background(Theme.inputBackground)
+            .overlay(Rectangle().stroke(Theme.borderColor, lineWidth: 1))
         }
     }
 }

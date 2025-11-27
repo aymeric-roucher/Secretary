@@ -6,35 +6,41 @@ struct OnboardingView: View {
     @Binding var isCompleted: Bool
     @AppStorage("openaiApiKey") var openaiApiKey: String = ""
     @AppStorage("hfApiKey") var hfApiKey: String = ""
-    
+
     @State private var openaiStatus: ValidationStatus = .none
     @State private var hfStatus: ValidationStatus = .none
     @State private var micStatus: ValidationStatus = .none
     @State private var accessStatus: ValidationStatus = .none
     @State private var lastCheckedOpenAIKey: String = ""
     @State private var lastCheckedHFKey: String = ""
-    
+
     var body: some View {
-        VStack(spacing: 18) {
-            VStack(spacing: 4) {
+        VStack(spacing: 24) {
+            VStack(spacing: 6) {
                 Text("Welcome to Jarvis")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .font(.custom("Georgia", size: 28))
+                    .fontWeight(.bold)
+                    .foregroundColor(.black)
                 Text("Your AI Secretary for macOS")
-                    .font(.system(size: 16, weight: .medium, design: .rounded))
-                    .foregroundColor(.secondary)
+                    .font(.custom("Georgia", size: 15))
+                    .foregroundColor(.gray)
+                    .italic()
             }
-            
+            .padding(.top, 8)
+
+            Divider().overlay(Color(white: 0.85))
+
             VStack(alignment: .leading, spacing: 12) {
                 Text("Shortcut")
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .font(.custom("Georgia", size: 16))
+                    .fontWeight(.semibold)
+                    .foregroundColor(.black)
                 ShortcutRecorder()
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
-            .background(Color(nsColor: .textBackgroundColor))
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.03), radius: 6, x: 0, y: 3)
-            
+
+            Divider().overlay(Color(white: 0.85))
+
             VStack(alignment: .leading, spacing: 12) {
                 ApiKeysSection(openaiKey: $openaiApiKey,
                                hfKey: $hfApiKey,
@@ -42,34 +48,30 @@ struct OnboardingView: View {
                                hfStatus: $hfStatus,
                                onApiKeysValidate: { Task { await validateKeys() } })
             }
-            .padding(14)
-            .background(Color(nsColor: .textBackgroundColor))
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.03), radius: 6, x: 0, y: 3)
-            
+
+            Divider().overlay(Color(white: 0.85))
+
             VStack(alignment: .leading, spacing: 12) {
                 PermissionsSection(micStatus: $micStatus,
                                    accessStatus: $accessStatus,
                                    requestMic: requestMic,
                                    checkAccess: checkAccessibility)
             }
-            .padding(14)
-            .background(Color(nsColor: .textBackgroundColor))
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.03), radius: 6, x: 0, y: 3)
-            
+
+            Spacer()
+
             HStack {
                 Spacer()
                 Button("Finish") {
                     NotificationCenter.default.post(name: NSNotification.Name("ReloadHotkey"), object: nil)
                     Task { await validateAllAndFinish() }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(ThemePrimaryButtonStyle())
             }
         }
-        .padding(24)
-        .frame(width: 520, height: 740)
-        .background(Color(nsColor: .underPageBackgroundColor))
+        .padding(32)
+        .frame(width: 520, height: 680)
+        .background(Color.white)
         .onAppear {
             loadAPIKeys(openaiKey: &openaiApiKey, hfKey: &hfApiKey)
             checkPermissions()
