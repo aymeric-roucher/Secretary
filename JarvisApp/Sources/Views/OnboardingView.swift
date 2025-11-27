@@ -11,6 +11,8 @@ struct OnboardingView: View {
     @State private var hfStatus: ValidationStatus = .none
     @State private var micStatus: ValidationStatus = .none
     @State private var accessStatus: ValidationStatus = .none
+    @State private var lastCheckedOpenAIKey: String = ""
+    @State private var lastCheckedHFKey: String = ""
     
     var body: some View {
         VStack(spacing: 18) {
@@ -60,7 +62,7 @@ struct OnboardingView: View {
                 Spacer()
                 Button("Finish") {
                     NotificationCenter.default.post(name: NSNotification.Name("ReloadHotkey"), object: nil)
-                    isCompleted = true
+                    Task { await validateAllAndFinish() }
                 }
                 .buttonStyle(.borderedProminent)
             }
@@ -107,14 +109,17 @@ struct OnboardingView: View {
         let (openResult, hfResult) = await ApiValidator.validate(openaiKey: openaiApiKey, hfKey: hfApiKey)
         openaiStatus = openResult == .valid ? .valid : .invalid
         hfStatus = hfResult == .valid ? .valid : .invalid
+        lastCheckedOpenAIKey = openaiApiKey
+        lastCheckedHFKey = hfApiKey
     }
     
-    func validateAllAndFinish() {
-        Task {
+    func validateAllAndFinish() async {
+        let keysChanged = openaiApiKey != lastCheckedOpenAIKey || hfApiKey != lastCheckedHFKey
+        if keysChanged {
             await validateKeys()
-            if openaiStatus == .valid && hfStatus == .valid && micStatus == .valid && accessStatus == .valid {
-                isCompleted = true
-            }
+        }
+        if openaiStatus == .valid && hfStatus == .valid && micStatus == .valid && accessStatus == .valid {
+            isCompleted = true
         }
     }
     
