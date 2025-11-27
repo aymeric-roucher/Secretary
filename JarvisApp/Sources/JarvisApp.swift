@@ -7,6 +7,8 @@ struct JarvisApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject var appState = AppState()
     @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
+    @AppStorage("JarvisShortcutModifier") var savedModifier: Int = ShortcutConfig.defaultModifier
+    @AppStorage("JarvisShortcutKey") var savedKey: Int = ShortcutConfig.defaultKey
 
     var body: some Scene {
         // Menu Bar Icon
@@ -25,7 +27,9 @@ struct JarvisApp: App {
             Divider()
             
             Menu("Shortcuts") {
-                Button("Toggle Jarvis (⇧Space)") { appState.toggleSpotlight() }
+                Button("Toggle Jarvis (\(ShortcutConfig.display(modifier: savedModifier, key: savedKey)))") {
+                    appState.toggleSpotlight()
+                }
             }
             
             Menu("Microphone") {
@@ -343,15 +347,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let hotKeyID = EventHotKeyID(signature: OSType(0x11223344), id: 1)
         var newHotKeyRef: EventHotKeyRef?
         
-        // Load from defaults or use Shift+Space (default)
-        let savedMod = UserDefaults.standard.integer(forKey: "JarvisShortcutModifier")
-        let savedKey = UserDefaults.standard.integer(forKey: "JarvisShortcutKey")
-        
-        // Default: Shift + Space (modifier shiftKey + keyCode 49)
-        let effectiveModifiers = savedMod == 0 ? Int(shiftKey) : savedMod
-        let effectiveKey = savedKey == 0 ? 49 : savedKey
-        if savedMod == 0 { UserDefaults.standard.set(effectiveModifiers, forKey: "JarvisShortcutModifier") }
-        if savedKey == 0 { UserDefaults.standard.set(effectiveKey, forKey: "JarvisShortcutKey") }
+        // Load from defaults or fall back to Control + Space
+        let defaults = UserDefaults.standard
+        let hasStoredMod = defaults.object(forKey: "JarvisShortcutModifier") != nil
+        let hasStoredKey = defaults.object(forKey: "JarvisShortcutKey") != nil
+        let storedMod = defaults.integer(forKey: "JarvisShortcutModifier")
+        let storedKey = defaults.integer(forKey: "JarvisShortcutKey")
+        let usesLegacyDefault = (storedMod == Int(shiftKey) && storedKey == 49) || (storedMod == Int(shiftKey) && storedKey == Int(kVK_ANSI_2))
+        let shouldResetToDefault = !hasStoredMod || !hasStoredKey || usesLegacyDefault
+        let effectiveModifiers = shouldResetToDefault ? ShortcutConfig.defaultModifier : storedMod
+        let effectiveKey = shouldResetToDefault ? ShortcutConfig.defaultKey : storedKey
+        if shouldResetToDefault {
+            defaults.set(ShortcutConfig.defaultModifier, forKey: "JarvisShortcutModifier")
+            defaults.set(ShortcutConfig.defaultKey, forKey: "JarvisShortcutKey")
+        }
         lastModifiers = UInt32(effectiveModifiers)
         lastKeyCode = UInt32(effectiveKey)
         
@@ -361,7 +370,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if err == noErr {
             hotKeyRef = newHotKeyRef
-            log("Global hotkey registered: Mod \(lastModifiers) Key \(lastKeyCode)")
+            log("Global hotkey registered: \(ShortcutConfig.display(modifier: Int(lastModifiers), key: Int(lastKeyCode))) (Mod \(lastModifiers) Key \(lastKeyCode))")
         } else {
             log("Failed to register global hotkey: \(err)")
         }
@@ -373,6 +382,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             // Dispatch to Main Actor to access AppState safely
             DispatchQueue.main.async {
+                guard UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") else {
+                    log("Hotkey ignored because onboarding is not completed.")
+                    return
+                }
+                
                 guard let appState = AppState.shared else {
                     log("AppState.shared missing in hotkey pressed handler")
                     return
@@ -395,6 +409,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         InstallEventHandler(target, { (nextHandler, theEvent, userData) -> OSStatus in
             log("Global Hotkey Handler Triggered (Released)!")
             DispatchQueue.main.async {
+                guard UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") else {
+                    log("Hotkey release ignored because onboarding is not completed.")
+                    return
+                }
                 guard let appState = AppState.shared else {
                     log("AppState.shared missing in hotkey released handler")
                     return
@@ -410,4 +428,47 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 struct ToolPayload: Codable {
     let name: String
     let arguments: String
+}
+
+private enum ShortcutConfig {
+    static let defaultModifier: Int = Int(shiftKey) // Shift
+    static let defaultKey: Int = 49 // Space
+    
+    static func display(modifier: Int, key: Int) -> String {
+        let modText = modifierSymbols(modifier)
+        let keyText = keyName(key)
+        if modText.isEmpty { return keyText }
+        return "\(modText)+\(keyText)"
+    }
+    
+    private static func modifierSymbols(_ carbonMod: Int) -> String {
+        var s = ""
+        if (carbonMod & Int(cmdKey)) != 0 { s += "⌘" }
+        if (carbonMod & Int(controlKey)) != 0 { s += "⌃" }
+        if (carbonMod & Int(optionKey)) != 0 { s += "⌥" }
+        if (carbonMod & Int(shiftKey)) != 0 { s += "⇧" }
+        return s
+    }
+    
+    private static func keyName(_ code: Int) -> String {
+        switch code {
+        case 50: return "`"
+        case 49: return "Space"
+        case 36: return "Return"
+        case 53: return "Esc"
+        case 48: return "Tab"
+        case 123: return "←"
+        case 124: return "→"
+        case 125: return "↓"
+        case 126: return "↑"
+        case 51: return "Delete"
+        case 117: return "Fwd Del"
+        case 115: return "Home"
+        case 119: return "End"
+        case 116: return "PgUp"
+        case 121: return "PgDn"
+        default:
+            return String(format: "%d", code)
+        }
+    }
 }

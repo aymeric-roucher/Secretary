@@ -24,7 +24,7 @@ The following tools are available to the AI:
 2.  Go to **Settings**.
 3.  Enter your **Gemini API Key**.
 4.  Grant Microphone and Accessibility permissions.
-5.  Use the global hotkey (default: `Shift+Space`) to talk to Jarvis.
+5.  Use the global hotkey (default: `@`, i.e. Shift+2) to talk to Jarvis.
 
 ## Implementation Details
 

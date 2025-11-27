@@ -53,7 +53,6 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .windowBackgroundColor))
         }
-        .frame(width: 800, height: 500)
     }
 }
 
@@ -207,6 +206,7 @@ struct GeneralSettingsView: View {
         .padding()
         .formStyle(.grouped)
         .onAppear {
+            loadAPIKeys(openaiKey: &openaiApiKey, hfKey: &hfApiKey)
             checkMic()
             checkAccess()
         }
@@ -243,7 +243,9 @@ struct GeneralSettingsView: View {
     }
     
     private func validateKeys() async {
-        let (openResult, hfResult) = await ApiValidator.validate(openaiKey: openaiApiKey, hfKey: hfApiKey)
-        log("API validation - OpenAI: \(openResult), HF: \(hfResult)")
+        async let openResult = ApiValidator.validateOpenAI(openaiKey: openaiApiKey)
+        async let hfResult = ApiValidator.validateHF(hfKey: hfApiKey)
+        let (open, hf) = await (openResult, hfResult)
+        log("API validation - OpenAI: \(open), HF: \(hf)")
     }
 }

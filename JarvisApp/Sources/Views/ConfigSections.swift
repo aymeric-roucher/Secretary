@@ -29,7 +29,7 @@ struct ApiKeysSection: View {
     @Binding var hfKey: String
     @Binding var openaiStatus: ValidationStatus
     @Binding var hfStatus: ValidationStatus
-    var onValidate: () -> Void
+    var onApiKeysValidate: () -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -37,7 +37,7 @@ struct ApiKeysSection: View {
                 Text("API Keys")
                     .font(.system(size: 17, weight: .semibold, design: .rounded))
                 Spacer()
-                Button("Check APIs") { onValidate() }
+                Button("Check APIs") { onApiKeysValidate() }
                     .buttonStyle(.bordered)
             }
             HStack {
@@ -98,39 +98,35 @@ enum ApiValidationResult {
 }
 
 enum ApiValidator {
-    static func validate(openaiKey: String, hfKey: String) async -> (ApiValidationResult, ApiValidationResult) {
-        async let openaiResult: ApiValidationResult = {
-            guard !openaiKey.isEmpty else { return .invalid }
-            let url = URL(string: "https://api.openai.com/v1/models")!
-            var req = URLRequest(url: url)
-            req.httpMethod = "GET"
-            req.setValue("Bearer \(openaiKey)", forHTTPHeaderField: "Authorization")
-            req.timeoutInterval = 5
-            do {
-                let (_, resp) = try await URLSession.shared.data(for: req)
-                if let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) {
-                    return .valid
-                }
-            } catch { }
-            return .invalid
-        }()
-        
-        async let hfResult: ApiValidationResult = {
-            guard !hfKey.isEmpty else { return .invalid }
-            let url = URL(string: "https://huggingface.co/api/whoami-v2")!
-            var req = URLRequest(url: url)
-            req.httpMethod = "GET"
-            req.setValue("Bearer \(hfKey)", forHTTPHeaderField: "Authorization")
-            req.timeoutInterval = 5
-            do {
-                let (_, resp) = try await URLSession.shared.data(for: req)
-                if let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) {
-                    return .valid
-                }
-            } catch { }
-            return .invalid
-        }()
-        
-        return await (openaiResult, hfResult)
+    static func validateOpenAI(openaiKey: String) async -> ApiValidationResult {
+        guard !openaiKey.isEmpty else { return .invalid }
+        let url = URL(string: "https://api.openai.com/v1/models")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.setValue("Bearer \(openaiKey)", forHTTPHeaderField: "Authorization")
+        req.timeoutInterval = 5
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            if let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) {
+                return .valid
+            }
+        } catch { }
+        return .invalid
+    }
+    
+    static func validateHF(hfKey: String) async -> ApiValidationResult {
+        guard !hfKey.isEmpty else { return .invalid }
+        let url = URL(string: "https://huggingface.co/api/whoami-v2")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.setValue("Bearer \(hfKey)", forHTTPHeaderField: "Authorization")
+        req.timeoutInterval = 5
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            if let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) {
+                return .valid
+            }
+        } catch { }
+        return .invalid
     }
 }

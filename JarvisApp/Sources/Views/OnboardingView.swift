@@ -40,7 +40,7 @@ struct OnboardingView: View {
                                hfKey: $hfApiKey,
                                openaiStatus: $openaiStatus,
                                hfStatus: $hfStatus,
-                               onValidate: { Task { await validateKeys() } })
+                               onApiKeysValidate: { Task { await validateKeys() } })
             }
             .padding(14)
             .background(Color(nsColor: .textBackgroundColor))
@@ -71,44 +71,19 @@ struct OnboardingView: View {
         .frame(width: 520, height: 740)
         .background(Color(nsColor: .underPageBackgroundColor))
         .onAppear {
-            loadEnv()
+            loadAPIKeys(openaiKey: &openaiApiKey, hfKey: &hfApiKey)
             checkPermissions()
-        }
-    }
-    
-    func loadEnv() {
-        // Try loading .env from typical locations
-        let fm = FileManager.default
-        let home = fm.homeDirectoryForCurrentUser
-        let possiblePaths = [
-            URL(fileURLWithPath: ".env"), // Current dir
-            home.appendingPathComponent(".env"),
-            home.appendingPathComponent("Documents/Code/Jarvis/.env")
-        ]
-        
-        for url in possiblePaths {
-            if let content = try? String(contentsOf: url) {
-                let lines = content.components(separatedBy: .newlines)
-                for line in lines {
-                    let parts = line.components(separatedBy: "=")
-                    if parts.count == 2 {
-                        let key = parts[0].trimmingCharacters(in: .whitespaces)
-                        let val = parts[1].trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "\"", with: "")
-                        
-                        if key == "OPENAI_API_KEY" && openaiApiKey.isEmpty { openaiApiKey = val }
-                        if key == "HF_TOKEN" && hfApiKey.isEmpty { hfApiKey = val }
-                    }
-                }
-            }
         }
     }
     
     func validateKeys() async {
         openaiStatus = .checking
         hfStatus = .checking
-        let (openResult, hfResult) = await ApiValidator.validate(openaiKey: openaiApiKey, hfKey: hfApiKey)
-        openaiStatus = openResult == .valid ? .valid : .invalid
-        hfStatus = hfResult == .valid ? .valid : .invalid
+        async let openResult = ApiValidator.validateOpenAI(openaiKey: openaiApiKey)
+        async let hfResult = ApiValidator.validateHF(hfKey: hfApiKey)
+        let (open, hf) = await (openResult, hfResult)
+        openaiStatus = open == .valid ? .valid : .invalid
+        hfStatus = hf == .valid ? .valid : .invalid
         lastCheckedOpenAIKey = openaiApiKey
         lastCheckedHFKey = hfApiKey
     }
@@ -146,13 +121,40 @@ struct OnboardingView: View {
         }
     }
     
-    func checkAccessibility() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-        let trusted = AXIsProcessTrustedWithOptions(options as CFDictionary)
-        accessStatus = trusted ? .valid : .none
-        if !trusted {
+func checkAccessibility() {
+    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+    let trusted = AXIsProcessTrustedWithOptions(options as CFDictionary)
+    accessStatus = trusted ? .valid : .none
+    if !trusted {
             // It will prompt. User has to go to settings.
             // We can re-check after a delay or user click.
+        }
+    }
+}
+
+// Shared helper to load API keys from local .env locations into the provided bindings if they are empty.
+func loadAPIKeys(openaiKey: inout String, hfKey: inout String) {
+    let fm = FileManager.default
+    let home = fm.homeDirectoryForCurrentUser
+    let possiblePaths = [
+        URL(fileURLWithPath: ".env"), // Current dir
+        home.appendingPathComponent(".env"),
+        home.appendingPathComponent("Documents/Code/Jarvis/.env")
+    ]
+    
+    for url in possiblePaths {
+        if let content = try? String(contentsOf: url) {
+            let lines = content.components(separatedBy: .newlines)
+            for line in lines {
+                let parts = line.components(separatedBy: "=")
+                if parts.count == 2 {
+                    let key = parts[0].trimmingCharacters(in: .whitespaces)
+                    let val = parts[1].trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "\"", with: "")
+                    
+                    if key == "OPENAI_API_KEY" && openaiKey.isEmpty { openaiKey = val }
+                    if key == "HF_TOKEN" && hfKey.isEmpty { hfKey = val }
+                }
+            }
         }
     }
 }
