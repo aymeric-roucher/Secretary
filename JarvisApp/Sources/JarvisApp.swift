@@ -72,12 +72,14 @@ struct ChatMessage: Identifiable {
     let role: MessageRole
     let content: String
     let toolPayload: ToolPayload?
-    
-    init(id: UUID = UUID(), role: MessageRole, content: String, toolPayload: ToolPayload? = nil) {
+    let timestamp: Date
+
+    init(id: UUID = UUID(), role: MessageRole, content: String, toolPayload: ToolPayload? = nil, timestamp: Date = Date()) {
         self.id = id
         self.role = role
         self.content = content
         self.toolPayload = toolPayload
+        self.timestamp = timestamp
     }
 }
 

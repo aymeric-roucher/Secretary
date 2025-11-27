@@ -2,39 +2,43 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
-    
+
     var body: some View {
         HStack(spacing: 0) {
             // Sidebar
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("JARVIS")
-                    .font(.caption)
+                    .font(.custom("Georgia", size: 11))
                     .fontWeight(.bold)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.top, 20)
-                
-                SidebarButton(title: "Chatbot", icon: "bubble.left.and.bubble.right", tab: .home, selection: $appState.selectedTab)
-                SidebarButton(title: "Logs", icon: "doc.plaintext", tab: .logs, selection: $appState.selectedTab)
-                SidebarButton(title: "Dictionary", icon: "book", tab: .dictionary, selection: $appState.selectedTab)
-                SidebarButton(title: "Style", icon: "text.quote", tab: .style, selection: $appState.selectedTab)
-                
+                    .foregroundColor(.gray)
+                    .tracking(1.5)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 24)
+
+                SidebarButton(title: "Home", tab: .home, selection: $appState.selectedTab)
+                SidebarButton(title: "Logs", tab: .logs, selection: $appState.selectedTab)
+                SidebarButton(title: "Dictionary", tab: .dictionary, selection: $appState.selectedTab)
+                SidebarButton(title: "Style", tab: .style, selection: $appState.selectedTab)
+
                 Spacer()
-                
+
                 Text("SETTINGS")
-                    .font(.caption)
+                    .font(.custom("Georgia", size: 11))
                     .fontWeight(.bold)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 10)
-                
-                SidebarButton(title: "Settings", icon: "gearshape.2", tab: .settings, selection: $appState.selectedTab)
-                    .padding(.bottom, 20)
+                    .foregroundColor(.gray)
+                    .tracking(1.5)
+                    .padding(.horizontal, 16)
+
+                SidebarButton(title: "Settings", tab: .settings, selection: $appState.selectedTab)
+                    .padding(.bottom, 24)
             }
-            .frame(width: 200)
-            .background(Color(nsColor: .controlBackgroundColor))
-            
-            Divider()
-            
+            .frame(width: 180)
+            .background(Color(white: 0.97))
+
+            Rectangle()
+                .fill(Color(white: 0.85))
+                .frame(width: 1)
+
             // Content Area
             VStack {
                 switch appState.selectedTab {
@@ -51,33 +55,30 @@ struct SettingsView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(nsColor: .windowBackgroundColor))
+            .background(Color.white)
         }
     }
 }
 
 struct SidebarButton: View {
     let title: String
-    let icon: String
     let tab: SettingsTab
     @Binding var selection: SettingsTab
-    
+
     var body: some View {
         Button(action: { selection = tab }) {
             HStack {
-                Image(systemName: icon)
-                    .frame(width: 20)
                 Text(title)
+                    .font(.custom("Georgia", size: 14))
                 Spacer()
             }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 10)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 16)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(selection == tab ? Color.blue.opacity(0.1) : Color.clear)
-        .foregroundColor(selection == tab ? .blue : .primary)
-        .cornerRadius(6)
+        .background(selection == tab ? Color.black.opacity(0.05) : Color.clear)
+        .foregroundColor(selection == tab ? .black : .gray)
         .padding(.horizontal, 8)
     }
 }
@@ -86,28 +87,137 @@ struct SidebarButton: View {
 
 struct HomeView: View {
     @EnvironmentObject var appState: AppState
-    
+
+    private var groupedMessages: [(user: ChatMessage, tool: ChatMessage?)] {
+        var groups: [(user: ChatMessage, tool: ChatMessage?)] = []
+        var i = 0
+        let messages = appState.messages
+        while i < messages.count {
+            let msg = messages[i]
+            if msg.role == .user {
+                var toolMsg: ChatMessage? = nil
+                if i + 1 < messages.count && messages[i + 1].role == .tool {
+                    toolMsg = messages[i + 1]
+                    i += 1
+                }
+                groups.append((user: msg, tool: toolMsg))
+            }
+            i += 1
+        }
+        return groups
+    }
+
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f
+    }()
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Chatbot")
-                .font(.title2)
-                .padding(.top)
-                .padding(.horizontal)
-            
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ForEach(appState.messages) { msg in
-                            ChatMessageRow(message: msg)
-                                .id(msg.id)
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Home")
+                .font(.custom("Georgia", size: 28))
+                .fontWeight(.bold)
+                .foregroundColor(.black)
+                .padding(.top, 24)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 16)
+
+            if groupedMessages.isEmpty {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Text("No messages")
+                        .font(.custom("Georgia", size: 15))
+                        .foregroundColor(.gray)
+                        .italic()
+                    Spacer()
+                }
+                Spacer()
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(Array(groupedMessages.enumerated()), id: \.element.user.id) { _, group in
+                                Divider()
+                                    .padding(.vertical, 16)
+                                MessageGroupRow(
+                                    userMessage: group.user,
+                                    toolMessage: group.tool,
+                                    timeFormatter: Self.timeFormatter
+                                )
+                                .id(group.user.id)
+                            }
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 24)
+                    }
+                    .onChange(of: appState.messages.count) { _, _ in
+                        if let lastGroup = groupedMessages.last {
+                            withAnimation { proxy.scrollTo(lastGroup.user.id, anchor: .bottom) }
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
                 }
-                .onChange(of: appState.messages.count) { _, _ in
-                    if let last = appState.messages.last {
-                        withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+            }
+        }
+        .background(Color.white)
+    }
+}
+
+struct MessageGroupRow: View {
+    let userMessage: ChatMessage
+    let toolMessage: ChatMessage?
+    let timeFormatter: DateFormatter
+
+    private static let toolIcons: [String: String] = [
+        "type": "pencil.and.line",
+        "deep_research": "magnifyingglass",
+        "open_app": "desktopcomputer",
+        "switch_to": "arrow.triangle.2.circlepath"
+    ]
+
+    private func toolIcon(for name: String?) -> String {
+        Self.toolIcons[name ?? ""] ?? "hammer.fill"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
+                Text(timeFormatter.string(from: userMessage.timestamp))
+                    .font(.custom("Georgia", size: 13))
+                    .foregroundColor(.gray)
+                    .frame(width: 40, alignment: .leading)
+
+                Image(systemName: "waveform")
+                    .font(.system(size: 12))
+                    .foregroundColor(.gray)
+                    .frame(width: 16)
+
+                Text(userMessage.content)
+                    .font(.custom("Georgia", size: 15))
+                    .foregroundColor(.black)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if let tool = toolMessage {
+                HStack(alignment: .top, spacing: 8) {
+                    Text("")
+                        .frame(width: 40)
+
+                    Image(systemName: toolIcon(for: tool.toolPayload?.name))
+                        .font(.system(size: 12))
+                        .foregroundColor(.gray)
+                        .frame(width: 16)
+
+                    HStack(alignment: .top, spacing: 6) {
+                        Text("\u{21B3}")
+                            .font(.custom("Georgia", size: 15))
+                            .foregroundColor(.gray)
+
+                        Text(tool.content)
+                            .font(.custom("Georgia", size: 14))
+                            .foregroundColor(.gray)
+                            .italic()
                     }
                 }
             }
@@ -115,24 +225,143 @@ struct HomeView: View {
     }
 }
 
-struct ChatMessageRow: View {
-    var message: ChatMessage
-
-    var body: some View {
-        ToolMessageView(role: message.role, content: message.content, toolName: message.toolPayload?.name)
-    }
-}
-
 struct DictionaryView: View {
+    @StateObject private var store = DictionaryStore()
+    @State private var newWord: String = ""
+    @State private var newInput: String = ""
+    @State private var newOutput: String = ""
+
     var body: some View {
-        VStack {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                header
+                entryForm
+                entryList
+            }
+            .padding(24)
+        }
+        .background(Color.white)
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
             Text("Dictionary")
-                .font(.title2)
-                .padding()
-            Text("Define custom words and abbreviations or common misspellings here.")
-                .foregroundColor(.secondary)
-            List {
-                Text("Coming soon...")
+                .font(.custom("Georgia", size: 28))
+                .fontWeight(.bold)
+                .foregroundColor(.black)
+            Text("Add custom words or map abbreviations/misspellings to their corrected form.")
+                .font(.custom("Georgia", size: 14))
+                .foregroundColor(.gray)
+        }
+    }
+
+    private var entryForm: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("New Word")
+                    .font(.custom("Georgia", size: 14))
+                    .fontWeight(.semibold)
+                    .foregroundColor(.black)
+                HStack(spacing: 12) {
+                    TextField("e.g. Eylul", text: $newWord)
+                        .textFieldStyle(.plain)
+                        .font(.custom("Georgia", size: 14))
+                        .padding(10)
+                        .background(Color(white: 0.97))
+                        .overlay(Rectangle().stroke(Color(white: 0.85), lineWidth: 1))
+                    Button("Add") {
+                        store.addWord(newWord)
+                        newWord = ""
+                    }
+                    .font(.custom("Georgia", size: 13))
+                    .buttonStyle(.bordered)
+                    .disabled(newWord.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("New Abbreviation / Correction")
+                    .font(.custom("Georgia", size: 14))
+                    .fontWeight(.semibold)
+                    .foregroundColor(.black)
+                HStack(spacing: 12) {
+                    TextField("From (e.g. teh)", text: $newInput)
+                        .textFieldStyle(.plain)
+                        .font(.custom("Georgia", size: 14))
+                        .padding(10)
+                        .background(Color(white: 0.97))
+                        .overlay(Rectangle().stroke(Color(white: 0.85), lineWidth: 1))
+                    Text("\u{2192}")
+                        .font(.custom("Georgia", size: 14))
+                        .foregroundColor(.gray)
+                    TextField("To (e.g. the)", text: $newOutput)
+                        .textFieldStyle(.plain)
+                        .font(.custom("Georgia", size: 14))
+                        .padding(10)
+                        .background(Color(white: 0.97))
+                        .overlay(Rectangle().stroke(Color(white: 0.85), lineWidth: 1))
+                    Button("Add") {
+                        store.addCorrection(from: newInput, to: newOutput)
+                        newInput = ""
+                        newOutput = ""
+                    }
+                    .font(.custom("Georgia", size: 13))
+                    .buttonStyle(.bordered)
+                    .disabled(newInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                              newOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+
+    private var entryList: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Entries")
+                    .font(.custom("Georgia", size: 16))
+                    .fontWeight(.semibold)
+                    .foregroundColor(.black)
+                Spacer()
+                if store.entries.isEmpty {
+                    Text("No entries yet")
+                        .font(.custom("Georgia", size: 13))
+                        .foregroundColor(.gray)
+                        .italic()
+                }
+            }
+            ForEach(store.entries) { entry in
+                HStack(spacing: 12) {
+                    if entry.kind == .correction {
+                        Text(entry.input)
+                            .font(.custom("Georgia", size: 14))
+                            .foregroundColor(.black)
+                        Text("\u{2192}")
+                            .font(.custom("Georgia", size: 14))
+                            .foregroundColor(.gray)
+                        Text(entry.output ?? "")
+                            .font(.custom("Georgia", size: 14))
+                            .foregroundColor(.black)
+                    } else {
+                        Text(entry.input)
+                            .font(.custom("Georgia", size: 14))
+                            .foregroundColor(.black)
+                    }
+                    Spacer()
+                    Button {
+                        store.remove(entry)
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11))
+                            .foregroundColor(.gray)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color(white: 0.97))
+                .overlay(Rectangle().stroke(Color(white: 0.9), lineWidth: 1))
             }
         }
     }
@@ -140,16 +369,31 @@ struct DictionaryView: View {
 
 struct StyleView: View {
     var body: some View {
-        VStack {
+        VStack(alignment: .leading, spacing: 0) {
             Text("Writing Style")
-                .font(.title2)
-                .padding()
+                .font(.custom("Georgia", size: 28))
+                .fontWeight(.bold)
+                .foregroundColor(.black)
+                .padding(.top, 24)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 8)
+
             Text("Provide examples of your writing style.")
-                .foregroundColor(.secondary)
+                .font(.custom("Georgia", size: 14))
+                .foregroundColor(.gray)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 16)
+
             TextEditor(text: .constant("Hi [Name],\n\nThanks for reaching out..."))
-                .border(Color.gray.opacity(0.2))
-                .padding()
+                .font(.custom("Georgia", size: 14))
+                .padding(16)
+                .background(Color(white: 0.97))
+                .overlay(Rectangle().stroke(Color(white: 0.85), lineWidth: 1))
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color.white)
     }
 }
 
