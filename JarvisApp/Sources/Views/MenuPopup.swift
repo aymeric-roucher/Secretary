@@ -69,7 +69,7 @@ struct MenuPopupView: View {
         .frame(width: popupWidth, alignment: .leading)
         .background(Theme.background)
         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
-        .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius).stroke(Color.black, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius).stroke(Theme.borderColor, lineWidth: 1))
     }
 
     @ViewBuilder
