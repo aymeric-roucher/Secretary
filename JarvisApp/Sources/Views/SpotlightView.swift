@@ -60,41 +60,61 @@ struct SpotlightView: View {
                 .padding(.horizontal, 24)
                 
                 // Waveform (Always Visible - Idle or Active)
-                WaveformView(levels: appState.audioRecorder.audioLevels, isRecording: appState.isRecording)
+                WaveformView(recorder: appState.audioRecorder, isRecording: appState.isRecording)
                     .frame(height: 60)
                     .padding(.bottom, 10)
                     .opacity(appState.isRecording ? 1.0 : 0.3)
                 
-                // Chat History / Result Area
-                if !appState.messages.isEmpty {
-                    Divider()
-                        .background(Color.white.opacity(0.1))
-                    
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 12) {
-                                ForEach(appState.messages) { msg in
-                                    MessageBubble(message: msg)
-                                        .id(msg.id)
-                                }
+                if appState.isProcessing {
+                    ProcessingIndicator()
+                        .padding(.bottom, 8)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+                
+                Divider()
+                    .background(Color.white.opacity(0.1))
+                
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 12) {
+                            ForEach(appState.messages) { msg in
+                                MessageBubble(message: msg)
+                                    .id(msg.id)
                             }
-                            .padding(24)
-                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .frame(maxHeight: 400)
-                        .onChange(of: appState.messages.count) { _ in
-                            if let last = appState.messages.last {
-                                withAnimation {
-                                    proxy.scrollTo(last.id, anchor: .bottom)
-                                }
-                            }
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 320)
+                    .onChange(of: appState.messages.count) { _, _ in
+                        if let last = appState.messages.last {
+                            withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
                         }
                     }
                 }
+                
+                Text("Press Esc or click outside to close")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+                    .padding(.bottom, 8)
             }
         }
         .frame(width: 700)
         .padding(20) // Window margin for shadow
+        .overlay(alignment: .top) {
+            if appState.shortRecordingWarning {
+                ShortRecordingToast(message: "The shortcut was pressed too briefly") {
+                    withAnimation { appState.shortRecordingWarning = false }
+                }
+                .padding(.top, 6)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            MessageOverlay(messages: appState.messages)
+                .padding(.top, 8)
+                .padding(.trailing, 12)
+        }
     }
 }
 
@@ -175,6 +195,46 @@ extension View {
     }
 }
 
+struct MessageOverlay: View {
+    var messages: [ChatMessage]
+    
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 8) {
+            ForEach(messages) { msg in
+                HStack(alignment: .top, spacing: 8) {
+                    icon(for: msg)
+                    Text(msg.content)
+                        .font(.system(size: 13))
+                        .foregroundColor(.primary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial)
+                .cornerRadius(12)
+                .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func icon(for msg: ChatMessage) -> some View {
+        switch msg.role {
+        case .user:
+            Image(systemName: "person")
+                .foregroundColor(.blue)
+        case .assistant:
+            Image(systemName: "sparkles")
+                .foregroundColor(.purple)
+        case .tool:
+            Image(systemName: "gearshape.fill")
+                .foregroundColor(.orange)
+        case .system:
+            Image(systemName: "info.circle")
+                .foregroundColor(.secondary)
+        }
+    }
+}
+
 struct RoundedCorner: Shape {
     var radius: CGFloat = .infinity
     var corners: RectCorner = .all
@@ -239,7 +299,7 @@ struct RectCorner: OptionSet {
 }
 
 struct WaveformView: View {
-    var levels: [Float]
+    @ObservedObject var recorder: AudioRecorder
     var isRecording: Bool
     
     // Idle animation state
@@ -267,29 +327,89 @@ struct WaveformView: View {
     func bar(index: Int, width: CGFloat, maxHeight: CGFloat) -> some View {
         // Recording Logic
         // Map index 0..39 to levels 0..39
+        let levels = recorder.audioLevels
         let mappedIndex = Int(Double(index) / 40.0 * Double(levels.count))
         let rawLevel = (isRecording && mappedIndex < levels.count) ? CGFloat(levels[levels.count - 1 - mappedIndex]) : 0.0
         
-        // Threshold logic: minimal clipping since we normalize in recorder
-        let effectiveLevel = rawLevel > 0.01 ? rawLevel : 0.0
+        // User request: No threshold at all
+        let effectiveLevel = rawLevel
         
         // Idle Logic (Sine wave)
+        // User request: "default static, with only a tiny animation"
         let offset = Double(index) * 0.5
-        let idleHeight = sin(offset + phase) * 6 + 10 // 4 to 16 height
+        let idleHeight = sin(offset + phase) * 2 + 4 // Very subtle breathing (2 to 6 height)
         
         // Combine
-        // Amplify effect: Square it to make peaks sharper? Or simple linear scale.
-        let activeHeight = max(6, effectiveLevel * maxHeight * 0.9)
+        // User request: "proportional to whatever volume is perceived"
+        // scaling rawLevel (0-1) to full height
+        let activeHeight = max(4, effectiveLevel * maxHeight)
+        
         let height = isRecording ? activeHeight : CGFloat(idleHeight)
         
         // Color
-        let activeColor = Color.red.opacity(0.7 + effectiveLevel * 0.3)
-        let idleColor = Color.secondary.opacity(0.3)
+        // Make it vibrant when loud, subtle when quiet
+        let activeColor = Color.red.opacity(0.5 + effectiveLevel * 0.5)
+        let idleColor = Color.secondary.opacity(0.2)
         let color = isRecording ? activeColor : idleColor
         
         return RoundedRectangle(cornerRadius: width / 2)
             .fill(color)
             .frame(width: width, height: height)
             .animation(.spring(response: 0.2, dampingFraction: 0.5), value: height)
+    }
+}
+
+struct ProcessingIndicator: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .progressViewStyle(.circular)
+                .scaleEffect(0.9)
+            Text("Processing...")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
+    }
+}
+
+struct ShortRecordingToast: View {
+    var message: String
+    var dismiss: () -> Void
+    
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.001)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { dismiss() }
+            
+            VStack {
+                HStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                    Text(message)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.primary)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial)
+                .cornerRadius(12)
+                .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 6)
+                
+                Spacer()
+            }
+            .frame(maxHeight: .infinity, alignment: .top)
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                dismiss()
+            }
+        }
     }
 }

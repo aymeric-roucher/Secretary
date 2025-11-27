@@ -5,11 +5,13 @@ class AudioRecorder: NSObject, ObservableObject {
     var audioRecorder: AVAudioRecorder?
     @Published var isRecording = false
     @Published var audioLevels: [Float] = []
+    private(set) var lastRecordingDuration: TimeInterval = 0
     
     private var timer: Timer?
     
     func startRecording() {
         log("Attempting to start recording.")
+        lastRecordingDuration = 0
         
         // 1. Check Microphone Permission
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
@@ -50,7 +52,7 @@ class AudioRecorder: NSObject, ObservableObject {
             
             let settings: [String: Any] = [
                 AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-                AVSampleRateKey: 44100, // Increased sample rate for better quality/Gemini compatibility
+                AVSampleRateKey: 44100, // Reasonable quality for STT
                 AVNumberOfChannelsKey: 1,
                 AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
                 AVEncoderBitRateKey: 128000 // Added bit rate
@@ -77,6 +79,7 @@ class AudioRecorder: NSObject, ObservableObject {
     
     func stopRecording() -> URL? {
         log("Attempting to stop recording.")
+        lastRecordingDuration = audioRecorder?.currentTime ?? 0
         audioRecorder?.stop()
         isRecording = false
         stopMonitoring()

@@ -18,6 +18,10 @@ struct ToolManager {
             if case .text(let appName) = args {
                 switchToApp(appName)
             }
+        case "deep_research":
+            if case .text(let topic) = args {
+                deepResearch(topic)
+            }
         default:
             print("Unknown tool: \(toolName)")
         }
@@ -69,4 +73,35 @@ struct ToolManager {
             }
         }
     }
+    
+    private func deepResearch(_ topic: String) {
+        // Simple implementation: open a web search for the topic
+        let query = topic.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? topic
+        if let url = URL(string: "https://www.google.com/search?q=\(query)") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+}
+
+enum ToolArguments: Codable {
+    case text(String)
+    case none
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let x = try? container.decode(String.self) {
+            self = .text(x)
+            return
+        }
+        if let x = try? container.decode([String:String].self) {
+            // Handle dictionary args if complex, for now simplify
+            if let val = x.values.first {
+                self = .text(val)
+                return
+            }
+        }
+        self = .none
+    }
+    
+    func encode(to encoder: Encoder) throws {}
 }

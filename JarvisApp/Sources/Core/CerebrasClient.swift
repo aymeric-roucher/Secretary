@@ -12,7 +12,7 @@ struct CerebrasClient {
         
         let systemPrompt = """
         You are a system assistant for macOS.
-        Output ONLY valid JSON with keys: "reasoning", "tool_name", "tool_arguments".
+        Output ONLY valid JSON with keys: "thought", "tool_name", "tool_arguments".
         Tools available:
         - type(text: String): Type text into active window.
         - open_app(name_or_url: String): Open app or URL.
@@ -53,30 +53,7 @@ struct CerebrasClient {
 }
 
 struct ToolCallResponse: Codable {
-    let reasoning: String
+    let thought: String?
     let tool_name: String
     let tool_arguments: ToolArguments
-}
-
-enum ToolArguments: Codable {
-    case text(String)
-    case none
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let x = try? container.decode(String.self) {
-            self = .text(x)
-            return
-        }
-        if let x = try? container.decode([String:String].self) {
-            // Handle dictionary args if complex, for now simplify
-            if let val = x.values.first {
-                self = .text(val)
-                return
-            }
-        }
-        self = .none
-    }
-    
-    func encode(to encoder: Encoder) throws {}
 }

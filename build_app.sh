@@ -10,6 +10,8 @@ echo "Building $APP_NAME using xcodebuild..."
 # Clear previous app settings to ensure onboarding runs for testing purposes
 echo "Clearing previous app settings for a fresh run..."
 defaults delete com.aymeric.Jarvis || true # '|| true' prevents script from failing if settings don't exist
+# Truncate in-app log for clean runs
+: > Jarvis_Log.txt
 
 # Clean previous build
 rm -rf "$BUILD_DIR"
@@ -21,6 +23,7 @@ xcodebuild -scheme "$SCHEME_NAME" \
            -configuration Release \
            -derivedDataPath "$BUILD_DIR" \
            -destination 'platform=macOS' \
+           -quiet \
            CODE_SIGN_IDENTITY="-" \
            CODE_SIGNING_REQUIRED="NO" \
            CODE_SIGNING_ALLOWED="NO"

@@ -52,12 +52,13 @@ struct JarvisApp: App {
             }
         }
         
-        // The "Spotlight" Window
-        WindowGroup(id: "spotlight") {
+        // The "Spotlight" Window (single instance)
+        Window("Jarvis", id: "spotlight") {
             SpotlightView()
                 .environmentObject(appState)
                 .onAppear {
                     if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "spotlight" }) {
+                        window.identifier = NSUserInterfaceItemIdentifier("spotlight")
                         window.styleMask = [.borderless, .fullSizeContentView]
                         window.isOpaque = false
                         window.backgroundColor = .clear
@@ -65,6 +66,9 @@ struct JarvisApp: App {
                         window.center()
                         window.isMovableByWindowBackground = true
                         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+                        window.standardWindowButton(.closeButton)?.isHidden = true
+                        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+                        window.standardWindowButton(.zoomButton)?.isHidden = true
                     }
                     log("Spotlight window appeared")
                 }
@@ -92,9 +96,15 @@ enum SettingsTab: String {
 }
 
 struct ChatMessage: Identifiable {
-    let id = UUID()
+    let id: UUID
     let role: MessageRole
     let content: String
+    
+    init(id: UUID = UUID(), role: MessageRole, content: String) {
+        self.id = id
+        self.role = role
+        self.content = content
+    }
 }
 
 enum MessageRole {
@@ -110,16 +120,20 @@ class AppState: ObservableObject {
     
     @Published var isSpotlightVisible: Bool = false
     @Published var isRecording: Bool = false
-    @Published var messages: [ChatMessage] = [ChatMessage(role: .system, content: "Ready")]
+    @Published var isProcessing: Bool = false
+    @Published var shortRecordingWarning: Bool = false
+    @Published var messages: [ChatMessage] = []
     @Published var selectedTab: SettingsTab = .home
-    
+
     let audioRecorder = AudioRecorder()
     let toolManager = ToolManager()
-    
+    private let minimumRecordingDuration: TimeInterval = 0.4
+    private var panelConfigured = false
     init() {
         AppState.shared = self
         // Listen for the toggle notification here, in the persistent state object
         NotificationCenter.default.addObserver(self, selector: #selector(handleToggleNotification), name: NSNotification.Name("ToggleJarvis"), object: nil)
+        configurePanelHandler()
     }
     
     @objc func handleToggleNotification() {
@@ -128,33 +142,42 @@ class AppState: ObservableObject {
     }
     
     func toggleSpotlight() {
-        isSpotlightVisible.toggle()
-        log("Toggle Spotlight: \(isSpotlightVisible)")
-        
-        if isSpotlightVisible {
-            activateSpotlight()
-        } else {
-            hideSpotlight()
+        if let handler = AppDelegate.shared?.floatingPanelHandler {
+            handler.toggle(appState: self)
         }
     }
     
-    private func activateSpotlight() {
-        NSApp.activate(ignoringOtherApps: true)
-        // Check if window is already open
-        if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "spotlight" }) {
-            window.makeKeyAndOrderFront(nil)
-        } else {
-            // If not found, try to open via URL
-            log("Spotlight window not found, opening via URL...")
-            if let url = URL(string: "jarvis://spotlight") {
-                NSWorkspace.shared.open(url)
+    func showSpotlight() {
+        configurePanelHandler()
+        AppDelegate.shared?.floatingPanelHandler.show(appState: self)
+        isSpotlightVisible = true
+        if !isRecording {
+            startRecording()
+        }
+    }
+    
+    func hideSpotlight() {
+        AppDelegate.shared?.floatingPanelHandler.hide()
+        if isRecording {
+            stopRecording()
+        }
+        isSpotlightVisible = false
+    }
+    
+    private func configurePanelHandler() {
+        guard !panelConfigured, let handler = AppDelegate.shared?.floatingPanelHandler else { return }
+        handler.configureOnClose { [weak self] in
+            Task { @MainActor in
+                self?.panelDidClose()
             }
         }
+        panelConfigured = true
     }
     
-    private func hideSpotlight() {
-        if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "spotlight" }) {
-            window.orderOut(nil)
+    private func panelDidClose() {
+        isSpotlightVisible = false
+        if isRecording {
+            stopRecording()
         }
     }
     
@@ -174,6 +197,9 @@ class AppState: ObservableObject {
     
     func startRecording() {
         log("Started recording")
+        SoundPlayer.playStart()
+        shortRecordingWarning = false
+        isProcessing = false
         isRecording = true
         audioRecorder.startRecording()
         // We don't clear messages, we append.
@@ -181,54 +207,67 @@ class AppState: ObservableObject {
     
     func stopRecording() {
         log("Stopped recording")
-        guard let fileURL = audioRecorder.stopRecording() else {
-            log("Error: No file URL returned from recorder")
-            return 
-        }
+        SoundPlayer.playStop()
         isRecording = false
         
-        // Add placeholder while processing? Or just wait.
-        // self.messages.append(ChatMessage(role: .system, content: "Processing..."))
+        guard let fileURL = audioRecorder.stopRecording() else {
+            log("Error: No file URL returned from recorder")
+            isProcessing = false
+            return 
+        }
+        
+        if audioRecorder.lastRecordingDuration < minimumRecordingDuration {
+            log("Recording too short: \(audioRecorder.lastRecordingDuration)s (threshold \(minimumRecordingDuration)s)")
+            withAnimation {
+                shortRecordingWarning = true
+            }
+            isProcessing = false
+            return
+        }
+        
+        isProcessing = true
         
         Task {
+            defer { Task { @MainActor in self.isProcessing = false } }
             do {
-                let geminiKey = UserDefaults.standard.string(forKey: "geminiApiKey") ?? ""
-                let hfKey = UserDefaults.standard.string(forKey: "hfApiKey") ?? ""
+                let openaiKey = UserDefaults.standard.string(forKey: "openaiApiKey") ?? ""
                 
-                if geminiKey.isEmpty || hfKey.isEmpty {
-                    self.messages.append(ChatMessage(role: .system, content: "Please set API Keys in Settings."))
-                    log("Missing API Keys")
+                if openaiKey.isEmpty {
+                    pushEphemeral(role: .system, content: "Please set OpenAI API Key in Settings.")
+                    log("Missing OpenAI API Key")
                     return
                 }
                 
-                let gemini = GeminiClient(apiKey: geminiKey)
-                log("Starting transcription...")
-                let text = try await gemini.transcribeAudio(fileURL: fileURL)
-                log("Transcription result: \(text)")
+                let whisper = WhisperClient(apiKey: openaiKey)
+                log("Sending audio to OpenAI Whisper...")
                 
-                self.messages.append(ChatMessage(role: .user, content: text))
+                let transcript = try await whisper.transcribe(fileURL: fileURL)
                 
-                // Process with Cerebras
-                let cerebras = CerebrasClient(apiKey: hfKey)
-                log("Requesting tool call...")
-                if let toolCall = try await cerebras.processCommand(input: text) {
-                    
-                    if !toolCall.reasoning.isEmpty {
-                        self.messages.append(ChatMessage(role: .assistant, content: toolCall.reasoning))
-                    }
-                    
-                    let toolMsg = "Running: \(toolCall.tool_name)(\(toolCall.tool_arguments))"
-                    self.messages.append(ChatMessage(role: .tool, content: toolMsg))
-                    
-                    log("Tool call: \(toolCall.tool_name) args: \(toolCall.tool_arguments)")
-                    self.toolManager.execute(toolName: toolCall.tool_name, args: toolCall.tool_arguments)
-                    
-                } else {
-                    log("No tool call generated")
+                // Append as user message (what was said)
+                pushEphemeral(role: .user, content: transcript)
+                log("Whisper transcription: \(transcript)")
+                
+                // Decide action using Cerebras
+                let hfKey = UserDefaults.standard.string(forKey: "hfApiKey") ?? ""
+                guard !hfKey.isEmpty else {
+                    pushEphemeral(role: .system, content: "Please set Hugging Face Token in Settings.")
+                    log("Missing Hugging Face token for Cerebras routing.")
+                    return
                 }
                 
+                let cerebras = CerebrasClient(apiKey: hfKey)
+                if let toolCall = try await cerebras.processCommand(input: transcript) {
+                    let reasoning = toolCall.thought ?? "Executing \(toolCall.tool_name)..."
+                    log("Cerebras output: \(reasoning)")
+                    log("Tool call: \(toolCall.tool_name), \(toolCall.tool_arguments)")
+                    pushEphemeral(role: .assistant, content: reasoning)
+                    self.toolManager.execute(toolName: toolCall.tool_name, args: toolCall.tool_arguments)
+                } else {
+                    pushEphemeral(role: .system, content: "Could not understand the command.")
+                    log("Cerebras returned no tool call.")
+                }
             } catch {
-                self.messages.append(ChatMessage(role: .system, content: "Error: \(error.localizedDescription)"))
+                pushEphemeral(role: .system, content: "Error: \(error.localizedDescription)")
                 log("Error processing: \(error)")
             }
         }
@@ -239,15 +278,25 @@ class AppState: ObservableObject {
             NSWorkspace.shared.open(url)
         }
     }
+    
+    @MainActor
+    private func pushEphemeral(role: MessageRole, content: String) {
+        let msg = ChatMessage(role: role, content: content)
+        messages.append(msg)
+        ToastManager.shared.show(message: msg)
+    }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+    static weak var shared: AppDelegate?
     var hotKeyRef: EventHotKeyRef?
-    var pollingTimer: Timer? // For Hold-to-Talk
+    var pollingTimer: Timer? // Unused now, kept for potential future hold-to-talk
     var lastKeyCode: UInt32 = 0
     var lastModifiers: UInt32 = 0
+    let floatingPanelHandler = FloatingPanelHandler()
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AppDelegate.shared = self
         log("Application finished launching")
         registerHotKey()
         
@@ -291,12 +340,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let savedMod = UserDefaults.standard.integer(forKey: "JarvisShortcutModifier")
         let savedKey = UserDefaults.standard.integer(forKey: "JarvisShortcutKey")
         
-        // Default: Shift (512) + Space (49)
-        lastModifiers = savedMod == 0 ? UInt32(shiftKey) : UInt32(savedMod)
-        lastKeyCode = savedKey == 0 ? 49 : UInt32(savedKey)
+        // Default: Backtick key (keyCode 50), no modifiers
+        lastModifiers = UInt32(savedMod)
+        lastKeyCode = savedKey == 0 ? 50 : UInt32(savedKey)
         
         // Register the HotKey. This will fire on keydown.
-        let err = RegisterEventHotKey(lastKeyCode, lastModifiers, hotKeyID, GetApplicationEventTarget(), 0, &newHotKeyRef)
+        let target = GetEventDispatcherTarget()
+        let effectiveModifiers = lastModifiers == 0 ? UInt32(shiftKey) : lastModifiers
+        let effectiveKey = lastKeyCode == 0 ? UInt32(49) : lastKeyCode // Space key default
+        lastModifiers = effectiveModifiers
+        lastKeyCode = effectiveKey
+        let err = RegisterEventHotKey(effectiveKey, effectiveModifiers, hotKeyID, target, 0, &newHotKeyRef)
         
         if err == noErr {
             hotKeyRef = newHotKeyRef
@@ -307,76 +361,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Install handler for the hotkey press event
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(GetApplicationEventTarget(), { (nextHandler, theEvent, userData) -> OSStatus in
+        InstallEventHandler(target, { (nextHandler, theEvent, userData) -> OSStatus in
             log("Global Hotkey Handler Triggered (Pressed)!")
             
             // Dispatch to Main Actor to access AppState safely
             DispatchQueue.main.async {
-                guard let appState = AppState.shared else { return }
-                
-                // Check if recording, if so, this is a toggle to stop early
-                if appState.isRecording {
-                     appState.stopRecording()
-                     // We need to access AppDelegate instance to stop timer
-                     if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
-                         appDelegate.pollingTimer?.invalidate()
-                         appDelegate.pollingTimer = nil
-                     }
-                     return
+                guard let appState = AppState.shared else {
+                    log("AppState.shared missing in hotkey pressed handler")
+                    return
                 }
                 
-                // Start recording and polling
-                appState.startRecording()
-                if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
-                    appDelegate.startPollingForKeyState()
+                if appState.isSpotlightVisible {
+                    if appState.isRecording {
+                        appState.stopRecording()
+                    }
+                    appState.hideSpotlight()
+                } else {
+                    appState.showSpotlight()
+                    appState.startRecording()
                 }
-                
-                // We still toggle the spotlight view so the user sees the input field
-                NotificationCenter.default.post(name: NSNotification.Name("ToggleJarvis"), object: nil)
             }
             
             return noErr
         }, 1, &eventType, nil, nil)
-    }
-    
-    func startPollingForKeyState() {
-        log("Starting polling for key state...")
-        pollingTimer?.invalidate() // Stop any previous timer
-        
-        let keyToMonitor = self.lastKeyCode
-        let modifiersToMonitor = self.lastModifiers
-        
-        pollingTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
-            DispatchQueue.main.async {
-                guard let self = self, let appState = AppState.shared, appState.isRecording else {
-                    self?.pollingTimer?.invalidate()
-                    self?.pollingTimer = nil
-                    log("Polling stopped (not recording or appState missing).")
-                    return
-                }
-                
-                // Correctly use static CGEventSource.keyState
-                let isKeyPressed = CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(keyToMonitor))
-                
-                // Check modifiers using CGEventSource flags
-                let flags = CGEventSource.flagsState(.combinedSessionState)
-                
-                // Check modifier keys explicitly (Control, Option, Shift, Command)
-                var currentModifiers: UInt32 = 0
-                if flags.contains(.maskControl) { currentModifiers |= UInt32(controlKey) }
-                if flags.contains(.maskAlternate) { currentModifiers |= UInt32(optionKey) }
-                if flags.contains(.maskShift) { currentModifiers |= UInt32(shiftKey) }
-                if flags.contains(.maskCommand) { currentModifiers |= UInt32(cmdKey) }
-                
-                // Strict check: key must be pressed. Modifiers are looser (if they release mods but hold key, maybe keep recording?)
-                // Let's enforce both for Hold-to-Talk behavior.
-                if !isKeyPressed || (currentModifiers & modifiersToMonitor) != modifiersToMonitor {
-                    log("Hotkey released. Stopping recording.")
-                    appState.stopRecording()
-                    self.pollingTimer?.invalidate()
-                    self.pollingTimer = nil
-                }
-            }
-        }
     }
 }

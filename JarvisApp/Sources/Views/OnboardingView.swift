@@ -4,12 +4,12 @@ import ApplicationServices
 
 struct OnboardingView: View {
     @Binding var isCompleted: Bool
-    @AppStorage("geminiApiKey") var geminiApiKey: String = ""
+    @AppStorage("openaiApiKey") var openaiApiKey: String = ""
     @AppStorage("hfApiKey") var hfApiKey: String = ""
     @State private var page = 0
     
     // Validation states
-    @State private var geminiStatus: ValidationStatus = .none
+    @State private var openaiStatus: ValidationStatus = .none
     @State private var hfStatus: ValidationStatus = .none
     @State private var micStatus: ValidationStatus = .none
     @State private var accessStatus: ValidationStatus = .none
@@ -65,25 +65,25 @@ struct OnboardingView: View {
             } else if page == 1 {
                 Text("API Keys")
                     .font(.title)
-                Text("Jarvis uses Gemini for hearing and Cerebras for thinking.")
+                Text("Jarvis uses OpenAI Whisper for hearing and Cerebras for thinking.")
                     .font(.caption)
                 
                 Form {
                     Section {
                         HStack {
-                            SecureField("Gemini API Key", text: $geminiApiKey)
-                                .onChange(of: geminiApiKey) { geminiStatus = .none }
-                            StatusIcon(status: geminiStatus)
+                            SecureField("OpenAI API Key", text: $openaiApiKey)
+                                .onChange(of: openaiApiKey) { oldValue, newValue in openaiStatus = .none }
+                            StatusIcon(status: openaiStatus)
                         }
                         HStack {
                             SecureField("Hugging Face Token", text: $hfApiKey)
-                                .onChange(of: hfApiKey) { hfStatus = .none }
+                                .onChange(of: hfApiKey) { oldValue, newValue in hfStatus = .none }
                             StatusIcon(status: hfStatus)
                         }
                     } header: {
                         Text("Enter Keys")
                     } footer: {
-                        if geminiStatus == .invalid || hfStatus == .invalid {
+                        if openaiStatus == .invalid || hfStatus == .invalid {
                             Text("One or more keys are invalid.").foregroundColor(.red)
                         }
                     }
@@ -96,7 +96,7 @@ struct OnboardingView: View {
                     Button("Verify & Next") {
                         validateKeys()
                     }
-                    .disabled(geminiApiKey.isEmpty || hfApiKey.isEmpty)
+                    .disabled(openaiApiKey.isEmpty || hfApiKey.isEmpty)
                 }
                 
             } else if page == 2 {
@@ -161,7 +161,7 @@ struct OnboardingView: View {
                         let key = parts[0].trimmingCharacters(in: .whitespaces)
                         let val = parts[1].trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "\"", with: "")
                         
-                        if key == "GEMINI_API_KEY" && geminiApiKey.isEmpty { geminiApiKey = val }
+                        if key == "OPENAI_API_KEY" && openaiApiKey.isEmpty { openaiApiKey = val }
                         if key == "HF_TOKEN" && hfApiKey.isEmpty { hfApiKey = val }
                     }
                 }
@@ -170,27 +170,19 @@ struct OnboardingView: View {
     }
     
     func validateKeys() {
-        geminiStatus = .checking
+        openaiStatus = .checking
         hfStatus = .checking
         
         Task {
-            // Mock validation for speed in prototype (or implement real call)
-            // Real call would use GeminiClient and CerebrasClient
-            
-            // Verify Gemini
-            _ = GeminiClient(apiKey: geminiApiKey)
-            // We can't easily "ping" without a file, but we assume non-empty is a start.
-            // For a real check, we'd try a text generation.
-            // Let's assume valid if > 20 chars for prototype speed, or try a simple call if we had a text-only endpoint in client.
-            // Since our client is audio-only currently, we will skip full network check to avoid error, or implement a simple check.
+            // Mock validation for speed in prototype
             try? await Task.sleep(nanoseconds: 500_000_000)
-            geminiStatus = geminiApiKey.count > 20 ? .valid : .invalid
+            openaiStatus = openaiApiKey.count > 20 ? .valid : .invalid
             
             // Verify HF
             try? await Task.sleep(nanoseconds: 500_000_000)
             hfStatus = hfApiKey.count > 20 ? .valid : .invalid
             
-            if geminiStatus == .valid && hfStatus == .valid {
+            if openaiStatus == .valid && hfStatus == .valid {
                 withAnimation { page += 1 }
             }
         }

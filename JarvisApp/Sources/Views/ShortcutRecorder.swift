@@ -5,8 +5,8 @@ struct ShortcutRecorder: View {
     @State private var isRecording = false
     
     // Initial values loaded from UserDefaults or Defaults
-    @AppStorage("JarvisShortcutModifier") var savedModifier: Int = Int(shiftKey) // Default Shift
-    @AppStorage("JarvisShortcutKey") var savedKey: Int = 49 // Default Space
+    @AppStorage("JarvisShortcutModifier") var savedModifier: Int = Int(shiftKey) // Default: Shift
+    @AppStorage("JarvisShortcutKey") var savedKey: Int = 49 // Default: Space
     
     @State private var displayModifier: String = ""
     @State private var displayKey: String = ""
@@ -49,8 +49,8 @@ struct ShortcutRecorder: View {
                 }
                 .buttonStyle(.plain)
                 .onAppear(perform: updateDisplay)
-                .onChange(of: savedModifier) { _ in updateDisplay() }
-                .onChange(of: savedKey) { _ in updateDisplay() }
+                .onChange(of: savedModifier) { _, _ in updateDisplay() }
+                .onChange(of: savedKey) { _, _ in updateDisplay() }
                 
                 if isRecording {
                     Button("Cancel") { isRecording = false }
@@ -83,6 +83,7 @@ struct ShortcutRecorder: View {
     func keyString(_ code: Int) -> String {
         // Simple virtual key code to string mapping for common keys
         switch code {
+        case 50: return "`"
         case 49: return "Space"
         case 36: return "Return"
         case 53: return "Esc"

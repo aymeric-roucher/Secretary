@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
-    @AppStorage("geminiApiKey") var geminiApiKey: String = ""
+    @AppStorage("openaiApiKey") var openaiApiKey: String = ""
     @AppStorage("hfApiKey") var hfApiKey: String = ""
     @State private var logContent: String = "Loading logs..."
     
@@ -47,7 +47,7 @@ struct SettingsView: View {
                 case .style:
                     StyleView()
                 case .settings:
-                    GeneralSettingsView(geminiApiKey: $geminiApiKey, hfApiKey: $hfApiKey)
+                    GeneralSettingsView(openaiApiKey: $openaiApiKey)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -58,7 +58,10 @@ struct SettingsView: View {
     }
     
     func loadLogs() {
-        let logFile = URL(fileURLWithPath: "/Users/aymeric/Documents/Code/Jarvis/Jarvis_Log.txt")
+        let appBundlePath = Bundle.main.bundleURL
+        let projectRoot = appBundlePath.deletingLastPathComponent()
+        let logFile = projectRoot.appendingPathComponent("Jarvis_Log.txt")
+        
         if let content = try? String(contentsOf: logFile) {
             logContent = content
         } else {
@@ -67,7 +70,10 @@ struct SettingsView: View {
     }
     
     func clearLogs() {
-        let logFile = URL(fileURLWithPath: "/Users/aymeric/Documents/Code/Jarvis/Jarvis_Log.txt")
+        let appBundlePath = Bundle.main.bundleURL
+        let projectRoot = appBundlePath.deletingLastPathComponent()
+        let logFile = projectRoot.appendingPathComponent("Jarvis_Log.txt")
+        
         try? "".write(to: logFile, atomically: true, encoding: .utf8)
         loadLogs()
     }
@@ -115,7 +121,11 @@ struct HomeView: View {
                 .padding(.top)
                 .padding(.horizontal)
             
-            Text("Logs at: /Users/aymeric/Documents/Code/Jarvis/Jarvis_Log.txt")
+            let appBundlePath = Bundle.main.bundleURL
+            let projectRoot = appBundlePath.deletingLastPathComponent()
+            let logPath = projectRoot.appendingPathComponent("Jarvis_Log.txt").path
+            
+            Text("Logs at: \(logPath)")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .padding(.horizontal)
@@ -177,8 +187,7 @@ import AVFoundation
 import ApplicationServices
 
 struct GeneralSettingsView: View {
-    @Binding var geminiApiKey: String
-    @Binding var hfApiKey: String
+    @Binding var openaiApiKey: String
     
     @State private var micStatus: Bool = false
     @State private var accessStatus: Bool = false
@@ -186,8 +195,12 @@ struct GeneralSettingsView: View {
     var body: some View {
         Form {
             Section("API Keys") {
-                SecureField("Gemini API Key", text: $geminiApiKey)
-                SecureField("Hugging Face Token", text: $hfApiKey)
+                SecureField("OpenAI API Key", text: $openaiApiKey)
+            }
+            
+            Section("Shortcut") {
+                ShortcutRecorder()
+                    .frame(height: 60)
             }
             
             Section("Permissions") {
@@ -212,7 +225,6 @@ struct GeneralSettingsView: View {
             
             Section("About") {
                 Text("Jarvis v1.0")
-                Text("Created with Gemini 1.5 Flash")
             }
         }
         .padding()
@@ -224,14 +236,17 @@ struct GeneralSettingsView: View {
     }
     
     func checkMic() {
+        NSApp.activate(ignoringOtherApps: true)
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
         switch status {
         case .authorized:
             micStatus = true
+            NSApp.activate(ignoringOtherApps: true)
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .audio) { granted in
                 DispatchQueue.main.async {
                     micStatus = granted
+                    NSApp.activate(ignoringOtherApps: true)
                 }
             }
         case .denied, .restricted:

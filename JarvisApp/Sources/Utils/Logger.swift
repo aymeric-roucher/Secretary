@@ -5,12 +5,18 @@ struct Logger {
     private let logFileURL: URL
     
     init() {
-        // Hardcoded to project root as requested for this dev environment
-        logFileURL = URL(fileURLWithPath: "/Users/aymeric/Documents/Code/Jarvis/Jarvis_Log.txt")
+        // Log file adjacent to the App Bundle (project root when running from build)
+        let appBundlePath = Bundle.main.bundleURL
+        let projectRoot = appBundlePath.deletingLastPathComponent()
+        logFileURL = projectRoot.appendingPathComponent("Jarvis_Log.txt")
         
-        // Create file if not exists
+        // Ensure file exists (create if not)
         if !FileManager.default.fileExists(atPath: logFileURL.path) {
-            try? "".write(to: logFileURL, atomically: true, encoding: .utf8)
+            do {
+                try "".write(to: logFileURL, atomically: true, encoding: .utf8)
+            } catch {
+                print("CRITICAL LOGGER ERROR: Could not create log file at \(logFileURL.path): \(error)")
+            }
         }
     }
     
