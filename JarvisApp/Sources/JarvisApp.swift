@@ -264,6 +264,11 @@ class AppState: ObservableObject {
                     log("Cerebras output: \(reasoning)")
                     log("Tool call: \(toolCall.tool_name), \(toolCall.tool_arguments)")
                     pushEphemeral(role: .assistant, content: reasoning)
+                    
+                    // For typing, hide panel to return focus to previous app
+                    if toolCall.tool_name == "type" {
+                        hideSpotlight()
+                    }
                     self.toolManager.execute(toolName: toolCall.tool_name, args: toolCall.tool_arguments)
                 } else {
                     pushEphemeral(role: .system, content: "Could not understand the command.")

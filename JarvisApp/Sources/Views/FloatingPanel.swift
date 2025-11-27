@@ -13,6 +13,7 @@ final class FloatingPanel<Content: View>: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
+        becomesKeyOnlyIfNeeded = true
         isMovableByWindowBackground = true
         hidesOnDeactivate = true
         standardWindowButton(.closeButton)?.isHidden = true

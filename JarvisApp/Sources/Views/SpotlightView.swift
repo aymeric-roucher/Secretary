@@ -5,102 +5,68 @@ struct SpotlightView: View {
     @State private var inputText: String = ""
     
     var body: some View {
-        ZStack {
-            // Main Background Pill
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                )
-            
-            VStack(spacing: 0) {
-                // Input & Status Area
-                HStack(spacing: 15) {
-                    // Dynamic Icon / Waveform
-                    ZStack {
-                        if appState.isRecording {
-                            Image(systemName: "mic.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(.red)
-                                .transition(.scale.combined(with: .opacity))
-                        } else {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 24))
-                                .foregroundColor(.secondary)
-                                .transition(.scale.combined(with: .opacity))
-                        }
-                    }
+        VStack(spacing: 0) {
+            // Status Area (no typing input; typing happens in active app)
+            HStack(spacing: 15) {
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 24))
+                    .foregroundColor(appState.isRecording ? .red : .secondary)
                     .frame(width: 30)
                     .onTapGesture {
                         withAnimation(.spring()) {
                             appState.toggleRecording()
                         }
                     }
-                    
-                    // Text Input
-                    TextField("Ask Jarvis...", text: $inputText)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 22, weight: .light))
-                        .padding(.vertical, 16)
-                        .onSubmit {
-                            // Handle text submission if needed
-                        }
-                    
-                    // Clear Button
-                    if !inputText.isEmpty {
-                        Button(action: { inputText = "" }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 24)
                 
-                // Waveform (Always Visible - Idle or Active)
-                WaveformView(recorder: appState.audioRecorder, isRecording: appState.isRecording)
-                    .frame(height: 60)
-                    .padding(.bottom, 10)
-                    .opacity(appState.isRecording ? 1.0 : 0.3)
-                
-                if appState.isProcessing {
-                    ProcessingIndicator()
-                        .padding(.bottom, 8)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-                
-                Divider()
-                    .background(Color.white.opacity(0.1))
-                
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
-                            ForEach(appState.messages) { msg in
-                                MessageBubble(message: msg)
-                                    .id(msg.id)
-                            }
-                        }
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .frame(maxHeight: 320)
-                    .onChange(of: appState.messages.count) { _, _ in
-                        if let last = appState.messages.last {
-                            withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
-                        }
-                    }
-                }
-                
-                Text("Press Esc or click outside to close")
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
-                    .padding(.bottom, 8)
+                Spacer()
             }
+            .padding(.horizontal, 24)
+            
+            // Waveform (Always Visible - Idle or Active)
+            WaveformView(recorder: appState.audioRecorder, isRecording: appState.isRecording)
+                .frame(height: 60)
+                .padding(.bottom, 10)
+                .opacity(appState.isRecording ? 1.0 : 0.3)
+            
+            if appState.isProcessing {
+                ProcessingIndicator()
+                    .padding(.bottom, 8)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+            
+            Divider()
+                .background(Color.white.opacity(0.1))
+            
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(appState.messages) { msg in
+                            MessageBubble(message: msg)
+                                .id(msg.id)
+                        }
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 320)
+                .onChange(of: appState.messages.count) { _, _ in
+                    if let last = appState.messages.last {
+                        withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                    }
+                }
+            }
+            
+            Text("Press Esc or click outside to close")
+                .font(.footnote)
+                .foregroundColor(.secondary)
+                .padding(.bottom, 8)
         }
         .frame(width: 700)
-        .padding(20) // Window margin for shadow
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+        )
         .overlay(alignment: .top) {
             if appState.shortRecordingWarning {
                 ShortRecordingToast(message: "The shortcut was pressed too briefly") {
@@ -109,11 +75,6 @@ struct SpotlightView: View {
                 .padding(.top, 6)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
-        }
-        .overlay(alignment: .topTrailing) {
-            MessageOverlay(messages: appState.messages)
-                .padding(.top, 8)
-                .padding(.trailing, 12)
         }
     }
 }
