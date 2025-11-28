@@ -109,6 +109,8 @@ class AppState: ObservableObject {
     let audioRecorder = AudioRecorder()
     let toolManager = ToolManager()
     private let minimumRecordingDuration: TimeInterval = 0.4
+    private var popupTimeoutTask: Task<Void, Never>?
+
     init() {
         AppState.shared = self
         // Listen for the toggle notification here, in the persistent state object
@@ -131,17 +133,40 @@ class AppState: ObservableObject {
     func showSpotlight() {
         AppDelegate.shared?.popupManager.show(appState: self)
         isSpotlightVisible = true
+        startPopupLifespanMonitor()
         if !isRecording {
             startRecording()
         }
     }
-    
+
     func hideSpotlight() {
+        popupTimeoutTask?.cancel()
+        popupTimeoutTask = nil
         AppDelegate.shared?.popupManager.hide()
         if isRecording {
             stopRecording()
         }
         isSpotlightVisible = false
+    }
+
+    private func startPopupLifespanMonitor() {
+        popupTimeoutTask?.cancel()
+        popupTimeoutTask = Task {
+            // Initial lifespan: 0.5 seconds
+            try? await Task.sleep(nanoseconds: 500_000_000)
+
+            // Keep extending while recording or processing
+            while !Task.isCancelled {
+                if isRecording || isProcessing {
+                    // Extend by 1 second
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                } else {
+                    // No activity, close popup
+                    hideSpotlight()
+                    return
+                }
+            }
+        }
     }
     
     func toggleRecording() {
@@ -468,7 +493,7 @@ struct ToolPayload: Codable {
 }
 
 private enum ShortcutConfig {
-    static let defaultModifier: Int = Int(shiftKey) // Shift
+    static let defaultModifier: Int = Int(controlKey) // Ctrl
     static let defaultKey: Int = 49 // Space
     
     static func display(modifier: Int, key: Int) -> String {
