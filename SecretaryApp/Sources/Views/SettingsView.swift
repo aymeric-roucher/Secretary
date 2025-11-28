@@ -441,6 +441,7 @@ struct GeneralSettingsView: View {
     @State private var hfStatus: ValidationStatus = .none
     @State private var micStatus: ValidationStatus = .none
     @State private var accessStatus: ValidationStatus = .none
+    @StateObject private var languageStore = LanguageStore()
 
     var body: some View {
         ScrollView {
@@ -461,6 +462,10 @@ struct GeneralSettingsView: View {
                     Text("Shortcut").font(Theme.headingFont).foregroundColor(Theme.textColor)
                     ShortcutRecorder().frame(height: 50)
                 }
+
+                Divider().overlay(Theme.borderColor)
+
+                LanguageSelectionSection(store: languageStore)
 
                 Divider().overlay(Theme.borderColor)
 

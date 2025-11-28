@@ -27,18 +27,22 @@ struct WaveformView: View {
     
     func bar(index: Int, width: CGFloat, maxHeight: CGFloat) -> some View {
         let levels = recorder.audioLevels
-        let mappedIndex = Int(Double(index) / 30.0 * Double(levels.count))
-        let rawLevel = (isRecording && mappedIndex < levels.count) ? CGFloat(levels[levels.count - 1 - mappedIndex]) : 0.0
+
+        // Waves propagate left to right: newest data on left (index 0), oldest on right
+        let sampleIndex = levels.count - 1 - index
+        let rawLevel: CGFloat = (isRecording && sampleIndex >= 0 && sampleIndex < levels.count)
+            ? CGFloat(levels[sampleIndex])
+            : 0.0
         let effectiveLevel = rawLevel > 0.01 ? rawLevel : 0.0
-        
+
         let offset = Double(index) * 0.5
         let idleHeight = sin(offset + phase) * 4 + 8
-        
+
         let activeHeight = max(5, effectiveLevel * maxHeight * 0.9)
         let height = isRecording ? activeHeight : CGFloat(idleHeight)
-        
+
         let color = Theme.textColor.opacity(0.6 + effectiveLevel * 0.4)
-        
+
         return RoundedRectangle(cornerRadius: width / 2)
             .fill(color)
             .frame(width: width, height: height)

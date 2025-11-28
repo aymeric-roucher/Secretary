@@ -13,18 +13,13 @@ struct OnboardingView: View {
     @State private var accessStatus: ValidationStatus = .none
     @State private var lastCheckedOpenAIKey: String = ""
     @State private var lastCheckedHFKey: String = ""
+    @StateObject private var languageStore = LanguageStore()
 
     var body: some View {
         VStack(spacing: 24) {
-            VStack(spacing: 6) {
-                Text("Welcome to Secretary")
-                    .font(Theme.titleFont)
-                    .foregroundColor(Theme.textColor)
-                Text("Your AI Secretary for macOS")
-                    .font(Theme.bodyFont)
-                    .foregroundColor(Theme.secondaryText)
-                    .italic()
-            }
+            Text("Welcome to Secretary")
+            .font(Theme.titleFont)
+            .foregroundColor(Theme.textColor)
             .padding(.top, 8)
 
             Divider().overlay(Theme.borderColor)
@@ -46,6 +41,13 @@ struct OnboardingView: View {
                                hfStatus: $hfStatus,
                                onApiKeysValidate: { Task { await validateKeys() } })
             }
+
+            Divider().overlay(Theme.borderColor)
+
+            VStack(alignment: .leading, spacing: 12) {
+                LanguageSelectionSection(store: languageStore)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Divider().overlay(Theme.borderColor)
 

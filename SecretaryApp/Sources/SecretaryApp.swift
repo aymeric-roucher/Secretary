@@ -228,9 +228,10 @@ class AppState: ObservableObject {
                 }
 
                 let whisper = TranscriptionClient(apiKey: openaiKey)
-                log("Sending audio to OpenAI Whisper...")
+                let languages = LanguageStore().languageCodes
+                log("Sending audio to OpenAI Whisper with languages: \(languages)...")
 
-                let transcript = try await whisper.transcribe(fileURL: fileURL)
+                let transcript = try await whisper.transcribe(fileURL: fileURL, languages: languages)
 
                 // Show transcript in popup and save to history
                 popupTranscript = transcript

@@ -9,16 +9,23 @@ struct TranscriptionClient {
         self.model = model
     }
     
-    func transcribe(fileURL: URL) async throws -> String {
+    /// Transcribes audio file to text.
+    /// - Parameters:
+    ///   - fileURL: URL to the audio file
+    ///   - languages: ISO-639-1 language codes. If single language, passes as hint to Whisper.
+    ///                If multiple languages, lets Whisper auto-detect.
+    func transcribe(fileURL: URL, languages: [String] = []) async throws -> String {
         let endpoint = URL(string: "https://api.openai.com/v1/audio/transcriptions")!
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        
+
         let boundary = "Boundary-\(UUID().uuidString)"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        
-        let body = try makeMultipartBody(fileURL: fileURL, boundary: boundary)
+
+        // Pass language hint only when single language selected for better accuracy
+        let languageHint: String? = languages.count == 1 ? languages.first : nil
+        let body = try makeMultipartBody(fileURL: fileURL, boundary: boundary, language: languageHint)
         request.httpBody = body
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -37,17 +44,22 @@ struct TranscriptionClient {
         throw NSError(domain: "TranscriptionClient", code: -1, userInfo: [NSLocalizedDescriptionKey: "No text in response"])
     }
     
-    private func makeMultipartBody(fileURL: URL, boundary: String) throws -> Data {
+    private func makeMultipartBody(fileURL: URL, boundary: String, language: String? = nil) throws -> Data {
         var body = Data()
         let lineBreak = "\r\n"
-        
+
         func appendField(name: String, value: String) {
             body.append("--\(boundary)\(lineBreak)")
             body.append("Content-Disposition: form-data; name=\"\(name)\"\(lineBreak)\(lineBreak)")
             body.append("\(value)\(lineBreak)")
         }
-        
+
         appendField(name: "model", value: model)
+
+        // Add language hint if provided (ISO-639-1 code)
+        if let language = language {
+            appendField(name: "language", value: language)
+        }
         
         let filename = fileURL.lastPathComponent
         let mimeType = mimeTypeFor(fileExtension: fileURL.pathExtension)

@@ -197,15 +197,17 @@ struct ThemedTextArea: View {
         ZStack(alignment: .topLeading) {
             if text.isEmpty {
                 Text(placeholder)
+                    .font(font)
                     .foregroundColor(Theme.secondaryText)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, 13)
+                    .padding(.vertical, 13)
                     .allowsHitTesting(false)
             }
             TextEditor(text: $text)
                 .font(font)
                 .foregroundColor(Theme.textColor)
-                .padding(8)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
                 .scrollContentBackground(.hidden)
         }
         .background(Theme.inputBackground)
