@@ -61,7 +61,7 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>LSUIElement</key>
-    <true/> <!-- Agent app, no dock icon -->
+    <false/>
     <key>NSMicrophoneUsageDescription</key>
     <string>Secretary needs your microphone to listen to your commands.</string>
     <key>NSAppleEventsUsageDescription</key>

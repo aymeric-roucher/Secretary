@@ -12,8 +12,8 @@ struct SecretaryApp: App {
 
     var body: some Scene {
         // Menu Bar Icon
-        MenuBarExtra("Secretary", systemImage: "waveform.circle") {
-            Button("Open App") {
+        MenuBarExtra("Secretary", systemImage: "pencil.line") {
+            Button("Open Secretary") {
                 appState.selectedTab = .home
                 appState.showSettings()
             }
