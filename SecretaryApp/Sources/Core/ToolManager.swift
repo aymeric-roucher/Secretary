@@ -48,33 +48,29 @@ struct ToolManager {
     
     private func typeString(_ string: String) {
         let pasteboard = NSPasteboard.general
-        Task { @MainActor in
-            AppState.shared?.popupClipboardMessage = nil
-        }
 
-        if shouldFallbackToClipboard() {
+        // Check focus state: .yes = text area focused, .no = no text area, .unknown = check failed
+        let focusState = checkFocusedTextArea()
+        log("Focus state: \(focusState)")
+
+        if focusState == .no {
+            // We know for sure there's no text area - copy to clipboard
+            log("No focused text area detected - copying to clipboard")
             pasteboard.clearContents()
             pasteboard.setString(string, forType: .string)
-
             Task { @MainActor in
-                AppState.shared?.popupClipboardMessage = "Content pasted to clipboard"
-                let notice = ChatMessage(role: .system, content: "Content pasted to clipboard")
-                AppState.shared?.messages.append(notice)
+                AppState.shared?.popupClipboardMessage = "Content copied to clipboard"
             }
-            log("No focused text input detected. Copied content to clipboard.")
             return
         }
 
-        // Save current clipboard content
+        // Either we have focus (.yes) or check failed (.unknown) - try to paste
         let previousContents = pasteboard.string(forType: .string)
-
-        // Set the text to paste
         pasteboard.clearContents()
         pasteboard.setString(string, forType: .string)
 
-        // Simulate Cmd+V to paste
         let source = CGEventSource(stateID: .hidSystemState)
-        let vKeyCode: CGKeyCode = 9 // 'v' key
+        let vKeyCode: CGKeyCode = 9
 
         if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: true) {
             keyDown.flags = .maskCommand
@@ -85,7 +81,6 @@ struct ToolManager {
             keyUp.post(tap: .cghidEventTap)
         }
 
-        // Restore previous clipboard content after a short delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             if let previous = previousContents {
                 pasteboard.clearContents()
@@ -94,18 +89,16 @@ struct ToolManager {
         }
     }
 
-    private func shouldFallbackToClipboard() -> Bool {
-        guard AXIsProcessTrusted() else {
-            log("Accessibility permissions missing; proceeding with normal typing.")
-            return false
-        }
+    private enum FocusState { case yes, no, unknown }
 
+    private func checkFocusedTextArea() -> FocusState {
         let systemWide = AXUIElementCreateSystemWide()
         var focusedElement: CFTypeRef?
-        let focusedStatus = AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedElement)
+        let status = AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedElement)
 
-        guard focusedStatus == .success, let element = focusedElement else {
-            return true
+        guard status == .success, let element = focusedElement else {
+            log("checkFocusedTextArea: failed to get focused element (status: \(status.rawValue))")
+            return .unknown
         }
 
         let axElement = element as! AXUIElement
@@ -113,8 +106,11 @@ struct ToolManager {
         let roleStatus = AXUIElementCopyAttributeValue(axElement, kAXRoleAttribute as CFString, &roleValue)
 
         guard roleStatus == .success, let role = roleValue as? String else {
-            return true
+            log("checkFocusedTextArea: failed to get role")
+            return .unknown
         }
+
+        log("checkFocusedTextArea: focused element role = \(role)")
 
         let textRoles: Set<String> = [
             kAXTextFieldRole as String,
@@ -125,17 +121,17 @@ struct ToolManager {
         ]
 
         if textRoles.contains(role) {
-            return false
+            return .yes
         }
 
         var isValueSettable = DarwinBoolean(false)
         if AXUIElementIsAttributeSettable(axElement, kAXValueAttribute as CFString, &isValueSettable) == .success && isValueSettable.boolValue {
-            return false
+            return .yes
         }
 
-        return true
+        return .no
     }
-    
+
     private func openAppOrURL(_ target: String) throws {
         // Check if target looks like a URL
         let isURL = target.contains(".") && (

@@ -133,11 +133,9 @@ enum Theme {
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let appName = json["app_name"] as? String {
             let icon = appIcon(for: appName)
-            log("iconForTool - matched app: \(appName) -> icon: \(icon)")
             return icon
         }
         let icon = toolIcon(for: name)
-        log("iconForTool - using toolIcon for name: \(name ?? "nil") -> icon: \(icon)")
         return icon
     }
 }
@@ -155,6 +153,9 @@ struct ThemeButtonStyle: ButtonStyle {
             .background(configuration.isPressed ? Theme.borderColor : Theme.buttonBackground)
             .clipShape(Capsule())
             .overlay(Capsule().stroke(Theme.borderColor, lineWidth: 1))
+            .onHover { hovering in
+                if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
     }
 }
 
@@ -168,6 +169,9 @@ struct ThemePrimaryButtonStyle: ButtonStyle {
             .background(configuration.isPressed ? Color(white: 0.2) : Theme.textColor)
             .clipShape(Capsule())
             .overlay(Capsule().stroke(Theme.borderColor, lineWidth: 1))
+            .onHover { hovering in
+                if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
     }
 }
 

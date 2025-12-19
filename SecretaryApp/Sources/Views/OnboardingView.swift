@@ -101,6 +101,8 @@ struct OnboardingView: View {
         if keysChanged {
             await validateKeys()
         }
+        // Also check accessibility (same as clicking "Check" near Typing)
+        checkAccessibility()
         if openaiStatus == .valid && hfStatus == .valid && micStatus == .valid && accessStatus == .valid {
             isCompleted = true
         }

@@ -512,6 +512,10 @@ struct GeneralSettingsView: View {
 
                 Divider().overlay(Theme.borderColor)
 
+                SoundsSection()
+
+                Divider().overlay(Theme.borderColor)
+
                 VStack(alignment: .leading, spacing: 8) {
                     Text("About").font(Theme.headingFont).foregroundColor(Theme.textColor)
                     Text("Secretary v1.0").font(Theme.bodyFont).foregroundColor(Theme.secondaryText).italic()
@@ -559,5 +563,73 @@ struct GeneralSettingsView: View {
     private func checkAccessibility() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
         accessStatus = AXIsProcessTrustedWithOptions(options as CFDictionary) ? .valid : .none
+    }
+}
+
+struct SoundPicker: View {
+    @Binding var selection: String
+
+    var body: some View {
+        Menu {
+            ForEach(SoundPlayer.soundOptions, id: \.self) { sound in
+                Button(sound) {
+                    selection = sound
+                    SoundPlayer.preview(sound: sound)
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(selection)
+                    .font(Theme.bodyFont)
+                    .foregroundColor(Theme.textColor)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 10))
+                    .foregroundColor(Theme.secondaryText)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Theme.buttonBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.borderColor, lineWidth: 1))
+        }
+        .menuStyle(.borderlessButton)
+        .onHover { hovering in
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
+    }
+}
+
+struct SoundsSection: View {
+    @AppStorage("startSound") private var startSound: String = SoundPlayer.defaultStartSound
+    @AppStorage("stopSound") private var stopSound: String = SoundPlayer.defaultStopSound
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Sounds").font(Theme.headingFont).foregroundColor(Theme.textColor)
+
+            HStack(spacing: 24) {
+                HStack(spacing: 8) {
+                    Text("Start:")
+                        .font(Theme.bodyFont.bold())
+                        .foregroundColor(Theme.textColor)
+                    SoundPicker(selection: $startSound)
+                }
+
+                HStack(spacing: 8) {
+                    Text("Stop:")
+                        .font(Theme.bodyFont.bold())
+                        .foregroundColor(Theme.textColor)
+                    SoundPicker(selection: $stopSound)
+                }
+            }
+            .padding(12)
+            .background(Theme.inputBackground)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
+            .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius).stroke(Theme.borderColor, lineWidth: 1))
+        }
     }
 }
