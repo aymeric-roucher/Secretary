@@ -28,7 +28,9 @@ enum Theme {
         "type": "rectangle.and.pencil.and.ellipsis",
         "deep_research": "magnifyingglass",
         "open_app": "desktopcomputer",
-        "switch_to": "arrow.triangle.2.circlepath"
+        "switch_to": "arrow.triangle.2.circlepath",
+        "spotify": "music.note",
+        "tool_call_failed": "xmark.octagon.fill"
     ]
 
     // MARK: App Icons

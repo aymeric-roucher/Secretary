@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import Carbon
+import ApplicationServices
 
 struct ToolManager {
 
@@ -23,6 +24,10 @@ struct ToolManager {
                 if case .text(let topic) = args {
                     deepResearch(topic)
                 }
+            case "spotify":
+                if case .text(let action) = args {
+                    try spotifyControl(action)
+                }
             default:
                 throw NSError(domain: "ToolManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unknown tool"])
             }
@@ -43,6 +48,22 @@ struct ToolManager {
     
     private func typeString(_ string: String) {
         let pasteboard = NSPasteboard.general
+        Task { @MainActor in
+            AppState.shared?.popupClipboardMessage = nil
+        }
+
+        if shouldFallbackToClipboard() {
+            pasteboard.clearContents()
+            pasteboard.setString(string, forType: .string)
+
+            Task { @MainActor in
+                AppState.shared?.popupClipboardMessage = "Content pasted to clipboard"
+                let notice = ChatMessage(role: .system, content: "Content pasted to clipboard")
+                AppState.shared?.messages.append(notice)
+            }
+            log("No focused text input detected. Copied content to clipboard.")
+            return
+        }
 
         // Save current clipboard content
         let previousContents = pasteboard.string(forType: .string)
@@ -71,6 +92,48 @@ struct ToolManager {
                 pasteboard.setString(previous, forType: .string)
             }
         }
+    }
+
+    private func shouldFallbackToClipboard() -> Bool {
+        guard AXIsProcessTrusted() else {
+            log("Accessibility permissions missing; proceeding with normal typing.")
+            return false
+        }
+
+        let systemWide = AXUIElementCreateSystemWide()
+        var focusedElement: CFTypeRef?
+        let focusedStatus = AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedElement)
+
+        guard focusedStatus == .success, let element = focusedElement else {
+            return true
+        }
+
+        let axElement = element as! AXUIElement
+        var roleValue: CFTypeRef?
+        let roleStatus = AXUIElementCopyAttributeValue(axElement, kAXRoleAttribute as CFString, &roleValue)
+
+        guard roleStatus == .success, let role = roleValue as? String else {
+            return true
+        }
+
+        let textRoles: Set<String> = [
+            kAXTextFieldRole as String,
+            kAXTextAreaRole as String,
+            kAXComboBoxRole as String,
+            "AXSearchField",
+            "AXWebArea"
+        ]
+
+        if textRoles.contains(role) {
+            return false
+        }
+
+        var isValueSettable = DarwinBoolean(false)
+        if AXUIElementIsAttributeSettable(axElement, kAXValueAttribute as CFString, &isValueSettable) == .success && isValueSettable.boolValue {
+            return false
+        }
+
+        return true
     }
     
     private func openAppOrURL(_ target: String) throws {
@@ -130,6 +193,30 @@ struct ToolManager {
         let query = topic.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? topic
         if let url = URL(string: "https://www.google.com/search?q=\(query)") {
             NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func spotifyControl(_ action: String) throws {
+        let command: String
+        switch action.lowercased() {
+        case "play":
+            command = "tell application \"Spotify\" to play"
+        case "pause":
+            command = "tell application \"Spotify\" to pause"
+        case "next":
+            command = "tell application \"Spotify\" to next track"
+        default:
+            throw NSError(domain: "ToolManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unknown Spotify action: \(action). Use play, pause, or next."])
+        }
+
+        let process = Process()
+        process.launchPath = "/usr/bin/osascript"
+        process.arguments = ["-e", command]
+        try process.run()
+        process.waitUntilExit()
+
+        if process.terminationStatus != 0 {
+            throw NSError(domain: "ToolManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to control Spotify"])
         }
     }
 }

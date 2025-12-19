@@ -45,11 +45,12 @@ class AudioRecorder: NSObject, ObservableObject {
         
         // 2. Proceed with recording if authorized
         do {
-            let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let secretaryDir = docs.appendingPathComponent("Secretary")
-            try? FileManager.default.createDirectory(at: secretaryDir, withIntermediateDirectories: true)
+            let projectRoot = Bundle.main.bundleURL.deletingLastPathComponent()
+            let recordingsDir = projectRoot.appendingPathComponent("recordings")
+            try? FileManager.default.createDirectory(at: recordingsDir, withIntermediateDirectories: true)
 
-            let fileURL = secretaryDir.appendingPathComponent("recording.m4a")
+            let timestamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+            let fileURL = recordingsDir.appendingPathComponent("\(timestamp).m4a")
             log("Recording to file: \(fileURL.path)")
             
             let settings: [String: Any] = [
@@ -130,10 +131,6 @@ class AudioRecorder: NSObject, ObservableObject {
         timer?.invalidate()
         timer = nil
         audioLevels.removeAll()
-    }
-    
-    private func getDocumentsDirectory() -> URL {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
 }
 

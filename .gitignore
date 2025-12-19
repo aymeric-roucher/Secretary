@@ -12,3 +12,4 @@ __pycache__
 *.d
 .env
 */.build
+recordings/

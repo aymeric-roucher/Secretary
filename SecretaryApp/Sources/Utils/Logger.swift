@@ -2,13 +2,11 @@ import Foundation
 
 struct Logger {
     static let shared = Logger()
+    static let projectRoot = Bundle.main.bundleURL.deletingLastPathComponent()
     private let logFileURL: URL
-    
+
     init() {
-        // Log file adjacent to the App Bundle (project root when running from build)
-        let appBundlePath = Bundle.main.bundleURL
-        let projectRoot = appBundlePath.deletingLastPathComponent()
-        logFileURL = projectRoot.appendingPathComponent("Secretary_Log.txt")
+        logFileURL = Logger.projectRoot.appendingPathComponent("Secretary_Log.txt")
         
         // Ensure file exists (create if not)
         if !FileManager.default.fileExists(atPath: logFileURL.path) {

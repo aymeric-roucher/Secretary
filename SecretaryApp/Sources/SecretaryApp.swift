@@ -92,6 +92,10 @@ enum MessageRole {
     case tool
 }
 
+enum ToolRoutingError: Error {
+    case noToolCall
+}
+
 @MainActor
 class AppState: ObservableObject {
     static var shared: AppState?
@@ -105,6 +109,7 @@ class AppState: ObservableObject {
     @Published var selectedTab: SettingsTab = .home
     @Published var popupTranscript: String?
     @Published var popupToolMessage: ChatMessage?
+    @Published var popupClipboardMessage: String?
 
     let audioRecorder = AudioRecorder()
     let toolManager = ToolManager()
@@ -191,6 +196,7 @@ class AppState: ObservableObject {
         isCompleted = false
         popupTranscript = nil
         popupToolMessage = nil
+        popupClipboardMessage = nil
         isRecording = true
         audioRecorder.startRecording()
     }
@@ -254,7 +260,11 @@ class AppState: ObservableObject {
                 let styleExamples = StyleStore().styleText
 
                 let cerebras = ThinkingClient(apiKey: hfKey)
-                if let toolCall = try await cerebras.processCommand(input: transcript, defaultBrowser: defaultBrowser, openAppsDescription: openAppsDescription, installedAppsDescription: installedAppsDescription, dictionaryEntries: dictionaryEntries, styleExamples: styleExamples) {
+                do {
+                    guard let toolCall = try await cerebras.processCommand(input: transcript, defaultBrowser: defaultBrowser, openAppsDescription: openAppsDescription, installedAppsDescription: installedAppsDescription, dictionaryEntries: dictionaryEntries, styleExamples: styleExamples) else {
+                        throw ToolRoutingError.noToolCall
+                    }
+
                     let toolDescription = formattedToolCall(toolCall)
                     log("Tool call: \(toolCall.tool_name), \(toolCall.tool_arguments)")
 
@@ -268,10 +278,8 @@ class AppState: ObservableObject {
 
                     // Show completion then hide after delay
                     await completeAndHidePopup()
-                } else {
-                    pushMessage(role: .system, content: "Could not understand the command.")
-                    log("Cerebras returned no tool call.")
-                    await completeAndHidePopup()
+                } catch {
+                    await handleCerebrasFailure(withTranscript: transcript, error: error)
                 }
             } catch {
                 pushMessage(role: .system, content: "Error: \(error.localizedDescription)")
@@ -342,6 +350,16 @@ class AppState: ObservableObject {
         case .none:
             return (toolCall.tool_name, "")
         }
+    }
+
+    @MainActor
+    private func handleCerebrasFailure(withTranscript transcript: String, error: Error) async {
+        log("Cerebras routing failed: \(error.localizedDescription)")
+        let failureMessage = createToolMessage(name: "tool_call_failed", args: "Reflection failed: \(error.localizedDescription)")
+        popupToolMessage = failureMessage
+        messages.append(failureMessage)
+        toolManager.execute(toolName: "type", args: .text(transcript))
+        await completeAndHidePopup()
     }
 }
 

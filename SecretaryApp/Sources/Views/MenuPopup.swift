@@ -8,12 +8,13 @@ struct PopupMessageRow: View {
     let icon: String
     let content: String
     var isSecondary: Bool = false
+    var iconColor: Color? = nil
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 12))
-                .foregroundColor(isSecondary ? Theme.secondaryText : Theme.textColor)
+                .foregroundColor(iconColor ?? (isSecondary ? Theme.secondaryText : Theme.textColor))
                 .frame(width: 16)
 
             Text(content)
@@ -56,9 +57,28 @@ struct MenuPopupView: View {
                         .foregroundColor(Theme.secondaryText)
                         .frame(width: 24)
 
+                    let icon = Theme.iconForTool(name: toolMsg.toolPayload?.name, arguments: toolMsg.toolPayload?.arguments)
+                    let iconColor = toolMsg.toolPayload?.name == "tool_call_failed" ? Color.red : nil
+
                     PopupMessageRow(
-                        icon: Theme.iconForTool(name: toolMsg.toolPayload?.name, arguments: toolMsg.toolPayload?.arguments),
+                        icon: icon,
                         content: toolMsg.content,
+                        isSecondary: true,
+                        iconColor: iconColor
+                    )
+                }
+            }
+
+            if let clipboardMsg = appState.popupClipboardMessage {
+                HStack(spacing: 12) {
+                    Text("↳")
+                        .font(Theme.bodyFont)
+                        .foregroundColor(Theme.secondaryText)
+                        .frame(width: 24)
+
+                    PopupMessageRow(
+                        icon: "doc.on.clipboard",
+                        content: clipboardMsg,
                         isSecondary: true
                     )
                 }
