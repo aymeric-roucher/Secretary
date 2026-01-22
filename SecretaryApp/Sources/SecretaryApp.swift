@@ -99,7 +99,7 @@ enum ToolRoutingError: Error {
 @MainActor
 class AppState: ObservableObject {
     static var shared: AppState?
-    
+
     @Published var isSpotlightVisible: Bool = false
     @Published var isRecording: Bool = false
     @Published var isProcessing: Bool = false
@@ -110,6 +110,9 @@ class AppState: ObservableObject {
     @Published var popupTranscript: String?
     @Published var popupToolMessage: ChatMessage?
     @Published var popupClipboardMessage: String?
+
+    /// Whether the next stopRecording should run in agentic mode
+    var pendingAgenticMode: Bool = false
 
     let audioRecorder = AudioRecorder()
     let toolManager = ToolManager()
@@ -202,7 +205,10 @@ class AppState: ObservableObject {
     }
     
     func stopRecording() {
-        log("Stopped recording")
+        let agenticMode = pendingAgenticMode
+        pendingAgenticMode = false
+
+        log("Stopped recording (agentic: \(agenticMode))")
         SoundPlayer.playStop()
         isRecording = false
         isProcessing = true
@@ -244,7 +250,17 @@ class AppState: ObservableObject {
                 pushMessage(role: .user, content: transcript)
                 log("Whisper transcription: \(transcript)")
 
-                // Decide action using Cerebras
+                // If not agentic mode, just type the transcript directly
+                if !agenticMode {
+                    let toolMsg = createToolMessage(name: "type", args: transcript)
+                    popupToolMessage = toolMsg
+                    messages.append(toolMsg)
+                    toolManager.execute(toolName: "type", args: .text(transcript))
+                    await completeAndHidePopup()
+                    return
+                }
+
+                // Agentic mode: Decide action using Cerebras
                 let hfKey = UserDefaults.standard.string(forKey: "hfApiKey") ?? ""
                 guard !hfKey.isEmpty else {
                     pushMessage(role: .system, content: "Please set Hugging Face Token in Settings.")
@@ -488,7 +504,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Hotkey released handler: stop recording but keep panel open
         var releaseType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyReleased))
         InstallEventHandler(target, { (nextHandler, theEvent, userData) -> OSStatus in
-            log("Global Hotkey Handler Triggered (Released)!")
+            // Check if fn key is pressed at the moment of release
+            let fnPressed = NSEvent.modifierFlags.contains(.function)
+            log("Global Hotkey Handler Triggered (Released)! fn=\(fnPressed)")
             DispatchQueue.main.async {
                 guard UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") else {
                     log("Hotkey release ignored because onboarding is not completed.")
@@ -499,6 +517,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     return
                 }
                 if appState.isRecording {
+                    // Set agentic mode based on fn key (configurable via agenticModifier setting)
+                    let agenticModifier = UserDefaults.standard.string(forKey: "agenticModifier") ?? "fn"
+                    let agenticEnabled: Bool
+                    switch agenticModifier {
+                    case "fn": agenticEnabled = fnPressed
+                    case "disabled": agenticEnabled = false
+                    case "always": agenticEnabled = true
+                    default: agenticEnabled = fnPressed
+                    }
+                    appState.pendingAgenticMode = agenticEnabled
                     appState.stopRecording()
                 }
             }

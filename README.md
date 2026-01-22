@@ -37,8 +37,10 @@ Voice Input → OpenAI Whisper → Cerebras LLM → Tool Execution
 
 1. Press and hold your hotkey
 2. Speak your command
-3. Release the hotkey
-4. Watch the popup show your transcript and action result
+3. Release the hotkey → transcribes and types your speech
+4. Hold **fn + hotkey** → enables agentic mode (LLM command routing)
+
+Configure agentic mode behavior in Settings (fn key, always on, or disabled).
 
 ## Project Structure
 
@@ -94,6 +96,7 @@ Settings are stored in UserDefaults:
 - `SecretaryShortcutModifier` - Hotkey modifier
 - `SecretaryShortcutKey` - Hotkey key code
 - `hasCompletedOnboarding` - Setup completion flag
+- `agenticModifier` - Agentic mode trigger: "fn" (default), "always", or "disabled"
 
 Audio recordings are saved to `~/Documents/Secretary/recording.m4a`
 

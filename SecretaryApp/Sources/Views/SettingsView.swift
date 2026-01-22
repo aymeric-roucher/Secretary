@@ -516,6 +516,10 @@ struct GeneralSettingsView: View {
 
                 Divider().overlay(Theme.borderColor)
 
+                AgenticModeSection()
+
+                Divider().overlay(Theme.borderColor)
+
                 VStack(alignment: .leading, spacing: 8) {
                     Text("About").font(Theme.headingFont).foregroundColor(Theme.textColor)
                     Text("Secretary v1.0").font(Theme.bodyFont).foregroundColor(Theme.secondaryText).italic()
@@ -630,6 +634,58 @@ struct SoundsSection: View {
             .background(Theme.inputBackground)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
             .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius).stroke(Theme.borderColor, lineWidth: 1))
+        }
+    }
+}
+
+struct AgenticModeSection: View {
+    @AppStorage("agenticModifier") private var agenticModifier: String = "fn"
+
+    private let options = [
+        ("fn", "fn key", "Hold fn + shortcut to enable agentic mode"),
+        ("always", "Always on", "Always use agentic mode (LLM routing)"),
+        ("disabled", "Disabled", "Always transcribe only, never route via LLM")
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Agentic Mode").font(Theme.headingFont).foregroundColor(Theme.textColor)
+
+            Text("By default, Secretary just transcribes and types your speech. Hold the modifier key to enable agentic mode (LLM command routing).")
+                .font(Theme.smallFont)
+                .foregroundColor(Theme.secondaryText)
+
+            Menu {
+                ForEach(options, id: \.0) { option in
+                    Button {
+                        agenticModifier = option.0
+                    } label: {
+                        VStack(alignment: .leading) {
+                            Text(option.1)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(options.first { $0.0 == agenticModifier }?.1 ?? "fn key")
+                        .font(Theme.bodyFont)
+                        .foregroundColor(Theme.textColor)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 10))
+                        .foregroundColor(Theme.secondaryText)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Theme.buttonBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.borderColor, lineWidth: 1))
+            }
+            .menuStyle(.borderlessButton)
+
+            Text(options.first { $0.0 == agenticModifier }?.2 ?? "")
+                .font(Theme.smallFont)
+                .foregroundColor(Theme.secondaryText)
+                .italic()
         }
     }
 }
